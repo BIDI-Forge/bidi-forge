@@ -1,0 +1,96 @@
+/*
+  RTL Workbench UI stylesheet (opt-in).
+  Intended to be injected by be5invis.vscode-custom-css.
+*/
+
+/* Flip overall workbench layout to RTL */
+body,
+.monaco-workbench,
+.monaco-workbench .part,
+.monaco-workbench .activitybar,
+.monaco-workbench .sidebar,
+.monaco-workbench .panel,
+.monaco-workbench .statusbar,
+.monaco-workbench .titlebar,
+.monaco-workbench .editor-group-container,
+.monaco-workbench .composite {
+  direction: rtl !important;
+}
+
+/* Align typical UI text to the right */
+.monaco-workbench .monaco-list-row,
+.monaco-workbench .monaco-list-row .monaco-icon-label,
+.monaco-workbench .monaco-icon-label .label-name,
+.monaco-workbench .monaco-icon-label .label-description,
+.monaco-workbench .pane-header,
+.monaco-workbench .pane-header .title,
+.monaco-workbench .panel .panel-title,
+.monaco-workbench .statusbar-item,
+.monaco-workbench .action-label,
+.monaco-workbench .inputbox,
+.monaco-workbench .quick-input-widget,
+.monaco-workbench .quick-input-widget .quick-input-titlebar,
+.monaco-workbench .quick-input-widget .quick-input-list {
+  text-align: right !important;
+}
+
+/* Fix common flex containers so icons stay visually consistent */
+.monaco-workbench .monaco-icon-label,
+.monaco-workbench .action-item,
+.monaco-workbench .action-label {
+  flex-direction: row-reverse !important;
+}
+
+/* Put scrollbar on left in lists (optional, improves RTL feel) */
+.monaco-workbench .monaco-list,
+.monaco-workbench .monaco-table,
+.monaco-workbench .monaco-scrollable-element {
+  direction: rtl !important;
+}
+
+/* EXCEPTIONS: keep code editor / terminal / code blocks LTR */
+.monaco-editor,
+.monaco-diff-editor,
+.monaco-editor .view-lines,
+.monaco-editor .view-line,
+.monaco-editor .margin,
+.monaco-editor .minimap,
+.monaco-editor .monaco-scrollable-element,
+.monaco-editor .inputarea,
+.monaco-editor .find-widget,
+.monaco-editor .suggest-widget,
+.monaco-editor .parameter-hints-widget,
+.monaco-editor .rename-box,
+.editor-widget,
+.debug-hover-widget,
+.monaco-hover,
+.monaco-hover .markdown-hover,
+.monaco-hover code,
+.monaco-hover pre,
+.monaco-hover .code,
+.xterm,
+.xterm-screen,
+.terminal-outer-container,
+.terminal-wrapper,
+.terminal-instance,
+.terminal {
+  direction: ltr !important;
+  text-align: left !important;
+}
+
+/* Ensure inline code and paths in UI remain LTR for readability */
+code,
+pre,
+.monaco-workbench .monaco-icon-label .label-description .path,
+.monaco-workbench .file-uri,
+.monaco-workbench .monaco-breadcrumbs,
+.monaco-workbench .monaco-breadcrumbs .breadcrumb-item {
+  direction: ltr !important;
+}
+
+/* Quick input: keep text box usable in RTL */
+.monaco-workbench .quick-input-widget input {
+  direction: rtl !important;
+  text-align: right !important;
+}
+

@@ -1,0 +1,17 @@
+{
+  "name": "@rtl-text-fixer/chrome-extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node esbuild.config.ts",
+    "dev": "node esbuild.config.ts --watch",
+    "lint": "eslint src esbuild.config.ts --max-warnings=0"
+  },
+  "dependencies": {
+    "@rtl-text-fixer/core": "workspace:*"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.1"
+  }
+}

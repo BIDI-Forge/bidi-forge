@@ -1,0 +1,10 @@
+**/.vscode/**
+**/src/**
+**/*.ts
+**/*.map
+**/tsconfig.json
+**/esbuild.config.ts
+**/node_modules/**
+pnpm-lock.yaml
+
+

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>RTL Text Fixer</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>RTL Text Fixer</h1>
+      <label class="row">
+        <input id="enabled" type="checkbox" />
+        <span>Enable on this browser</span>
+      </label>
+      <p class="hint">
+        When enabled, the extension scans page text nodes and fixes mixed Persian/English
+        readability.
+      </p>
+    </main>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

@@ -1,0 +1,93 @@
+{
+  "name": "rtl-text-fixer",
+  "displayName": "RTL Text Fixer",
+  "description": "Fix mixed Persian (RTL) and English (LTR) text readability by inserting Unicode bidi markers.",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "publisher": "rtl-text-fixer",
+  "icon": "icon.png",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Tocka69/rtl-text-fixer.git"
+  },
+  "homepage": "https://github.com/Tocka69/rtl-text-fixer",
+  "bugs": {
+    "url": "https://github.com/Tocka69/rtl-text-fixer/issues"
+  },
+  "keywords": [
+    "rtl",
+    "persian",
+    "farsi",
+    "bidi",
+    "unicode",
+    "cursor",
+    "vscode"
+  ],
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "extensionDependencies": [
+    "be5invis.vscode-custom-css"
+  ],
+  "activationEvents": [
+    "onCommand:rtlFixer.fixSelectedText",
+    "onCommand:rtlFixer.fixClipboardText",
+    "onCommand:rtlFixer.enableRtlUi",
+    "onCommand:rtlFixer.disableRtlUi"
+  ],
+  "main": "./dist/extension.cjs",
+  "contributes": {
+    "commands": [
+      {
+        "command": "rtlFixer.fixSelectedText",
+        "title": "RTL Fixer: ‏اصلاح متن انتخاب‌شده"
+      },
+      {
+        "command": "rtlFixer.fixClipboardText",
+        "title": "RTL Fixer: ‏اصلاح متن کلیپ‌بورد"
+      },
+      {
+        "command": "rtlFixer.enableRtlUi",
+        "title": "RTL Fixer: فعال‌سازی RTL برای UI (با Custom CSS)"
+      },
+      {
+        "command": "rtlFixer.disableRtlUi",
+        "title": "RTL Fixer: غیرفعال‌سازی RTL برای UI (با Custom CSS)"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "rtlFixer.fixSelectedText",
+        "key": "ctrl+alt+r",
+        "mac": "cmd+alt+r",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "rtlFixer.fixClipboardText",
+        "key": "ctrl+alt+shift+r",
+        "mac": "cmd+alt+shift+r",
+        "when": "editorTextFocus"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "node esbuild.config.ts",
+    "dev": "node esbuild.config.ts --watch",
+    "lint": "eslint src esbuild.config.ts --max-warnings=0",
+    "package": "pnpm build && vsce package --no-dependencies",
+    "publish": "pnpm build && vsce publish --no-dependencies"
+  },
+  "dependencies": {
+    "@rtl-text-fixer/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.90.0",
+    "@vscode/vsce": "^3.7.1",
+    "esbuild": "^0.25.1"
+  }
+}
