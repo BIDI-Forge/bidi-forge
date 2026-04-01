@@ -1,8 +1,10 @@
 # RTL Text Fixer
 
-Fix mixed Persian (RTL) and English (LTR) text readability issues by automatically inserting Unicode bidirectional markers (LRM/RLM).
+<p align="center">
+  <img src="assets/logo.png" alt="RTL Text Fixer logo" width="160" />
+</p>
 
-> لوگو: در حال آماده‌سازی (فعلاً اینجا اضافه نشده).
+Fix mixed Persian (RTL) and English (LTR) text readability issues by automatically inserting Unicode bidirectional markers (LRM/RLM).
 
 ## Badges
 
