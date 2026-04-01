@@ -24,12 +24,19 @@ async function buildAll(): Promise<void> {
   await ensureOutDir();
   await copyStatic();
 
+  // Content scripts are not treated as ESM modules by Chrome, so they must not contain `export`.
+  // Background service worker can be ESM, and popup is loaded as a module in popup.html.
   await esbuild.build({
-    entryPoints: {
-      content: "src/content.ts",
-      background: "src/background.ts",
-      popup: "src/popup.ts",
-    },
+    entryPoints: { content: "src/content.ts" },
+    bundle: true,
+    format: "iife",
+    target: ["chrome114"],
+    outdir,
+    sourcemap: true,
+  });
+
+  await esbuild.build({
+    entryPoints: { background: "src/background.ts", popup: "src/popup.ts" },
     bundle: true,
     format: "esm",
     target: ["chrome114"],
@@ -54,6 +61,9 @@ if (isWatch) {
     outdir,
     sourcemap: true,
   });
+
+  // Note: watch mode uses ESM for rebuild speed; run `pnpm build` before packing/loading to ensure
+  // `content.js` is rebuilt as IIFE (no ESM exports).
 
   // esbuild@0.25.x: watch() has no onRebuild callback.
   await ctx.watch();

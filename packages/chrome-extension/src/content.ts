@@ -29,7 +29,7 @@ function isInsideEditable(node: Node): boolean {
   return Boolean(editable);
 }
 
-export function isEditableElement(
+function isEditableElement(
   el: Element,
 ): el is HTMLTextAreaElement | (HTMLElement & { isContentEditable: boolean }) {
   if (el.tagName === "TEXTAREA") return true;
