@@ -7,16 +7,41 @@
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
-    <main class="container">
-      <h1>RTL Text Fixer</h1>
-      <label class="row">
-        <input id="enabled" type="checkbox" />
-        <span>Enable on this browser</span>
-      </label>
-      <p class="hint">
-        When enabled, the extension scans page text nodes and fixes mixed Persian/English
-        readability.
-      </p>
+    <main class="app" aria-label="RTL Text Fixer settings">
+      <header class="header">
+        <div class="titleRow">
+          <div class="mark" aria-hidden="true"></div>
+          <div>
+            <h1 class="title">RTL Text Fixer</h1>
+            <p class="subtitle">Fix mixed Persian/English readability on modern chat sites.</p>
+          </div>
+        </div>
+      </header>
+
+      <section class="card" aria-label="Main setting">
+        <div class="cardRow">
+          <div class="cardText">
+            <div class="cardTitle">Enable</div>
+            <div class="cardHint">Applies to this browser profile.</div>
+          </div>
+
+          <label class="switch" aria-label="Enable RTL Text Fixer">
+            <input id="enabled" type="checkbox" />
+            <span class="track" aria-hidden="true"></span>
+            <span class="thumb" aria-hidden="true"></span>
+          </label>
+        </div>
+
+        <div class="statusRow" role="status" aria-live="polite">
+          <span id="status" class="status">Loading…</span>
+        </div>
+      </section>
+
+      <footer class="footer">
+        <div class="sites">
+          Works best on ChatGPT, Claude, Gemini, Grok, Qwen, DeepSeek.
+        </div>
+      </footer>
     </main>
     <script type="module" src="popup.js"></script>
   </body>
