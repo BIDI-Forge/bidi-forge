@@ -1,8 +1,23 @@
-## RTL Text Fixer
+# RTL Text Fixer
 
-Production-ready TypeScript monorepo for fixing mixed Persian (RTL) and English (LTR) text readability issues by automatically inserting Unicode bidirectional markers.
+Fix mixed Persian (RTL) and English (LTR) text readability issues by automatically inserting Unicode bidirectional markers (LRM/RLM).
 
-### What it does
+> لوگو: در حال آماده‌سازی (فعلاً اینجا اضافه نشده).
+
+## Badges
+
+- **License**: MIT
+- **Version (VS Code extension)**: 0.1.0
+- **Stack**: TypeScript + pnpm (workspace) + Node.js 18+
+
+## Features
+
+- **Fix mixed RTL/LTR**: inserts invisible bidi markers so text renders in the intended order.
+- **VS Code / Cursor**: fix selected text or clipboard via commands/keybindings.
+- **Chrome (MV3)**: fixes DOM text nodes with an enable/disable toggle (sync storage).
+- **Core engine**: reusable TypeScript function you can import in other apps.
+
+## What it does
 
 When Persian and English are mixed, some renderers show confusing ordering. This project improves readability by inserting invisible Unicode markers:
 
@@ -14,16 +29,7 @@ Example:
 - **Input**: `سلام hello دنیا`
 - **Output**: `سلام \u200Ehello\u200E دنیا`
 
-### Architecture
-
-Monorepo (pnpm workspace):
-
-- `packages/shared`: shared TypeScript types
-- `packages/core`: reusable text engine (`fixMixedText(text)`)
-- `packages/vscode-extension`: VS Code extension that fixes selected text
-- `packages/chrome-extension`: Chrome MV3 extension that fixes DOM text nodes
-
-### Installation
+## Quick Start / Installation
 
 Requirements:
 
@@ -35,8 +41,6 @@ Install deps:
 ```bash
 pnpm install
 ```
-
-### Development
 
 Build everything once:
 
@@ -63,6 +67,8 @@ pnpm format
 pnpm lint
 ```
 
+## Usage
+
 ### Using the core engine
 
 The core package exports:
@@ -72,13 +78,15 @@ The core package exports:
 - `tokenizeText(text)`
 - `applyBidiMarkers(tokens)`
 
-### VS Code extension
+### VS Code & Cursor
 
 - **Command**: `RTL Fixer: اصلاح متن انتخاب‌شده`
 - **Command (Clipboard)**: `RTL Fixer: اصلاح متن کلیپ‌بورد`
 - **Activation**: `onCommand:rtlFixer.fixSelectedText`
 - **Example keybinding**: `Ctrl+Alt+R` (macOS: `Cmd+Alt+R`)
 - **Example keybinding (Clipboard)**: `Ctrl+Alt+Shift+R` (macOS: `Cmd+Alt+Shift+R`)
+
+More details: `packages/vscode-extension/README.md`
 
 #### RTL UI (Workbench) for Cursor / VS Code (opt-in)
 
@@ -112,7 +120,63 @@ To load unpacked:
 
 The popup provides an enable/disable toggle using `chrome.storage.sync`.
 
-### Publishing
+## Examples
+
+- **Mixed text**: `سلام hello دنیا` → `سلام \u200Ehello\u200E دنیا`
+- **Clipboard workflow (Cursor Chat)**: run `RTL Fixer: اصلاح متن کلیپ‌بورد` → paste into chat.
+
+## Supported languages
+
+- **فارسی** (Persian / Farsi)
+- **عربی** (Arabic)
+- **English** (and other LTR scripts)
+
+> نکته: این ابزار روی «ترکیب RTL/LTR» تمرکز دارد و برای هر متنی که ترکیب اسکریپت‌ها باعث بهم‌ریختگی ترتیب می‌شود مفید است.
+
+## Downloads
+
+- **VS Code / Cursor**: build a `.vsix` from `packages/vscode-extension`:
+
+```bash
+pnpm -C packages/vscode-extension package
+```
+
+- **Chrome**: build and load unpacked from `packages/chrome-extension/dist`:
+
+```bash
+pnpm -C packages/chrome-extension build
+```
+
+## Architecture
+
+Monorepo (pnpm workspace):
+
+- `packages/shared`: shared TypeScript types
+- `packages/core`: reusable text engine (`fixMixedText(text)`)
+- `packages/vscode-extension`: VS Code extension that fixes selected text
+- `packages/chrome-extension`: Chrome MV3 extension that fixes DOM text nodes
+
+## Contributing
+
+- See `CONTRIBUTING.md`.
+- Please follow `CODE_OF_CONDUCT.md`.
+
+## Security
+
+If you discover a security issue, please follow `SECURITY.md` for responsible disclosure.
+
+## License
+
+MIT — see `LICENSE`.
+
+For open-source projects, the MIT License is a popular choice because it is simple and permissive.
+
+## Acknowledgments
+
+- Unicode bidirectional marks: LRM/RLM
+- Opt-in workbench RTL approach powered by `be5invis.vscode-custom-css`
+
+## Publishing
 
 - **VS Code / Cursor**: from `packages/vscode-extension` run `pnpm package` to build a `.vsix`.
 - **Chrome**: zip `packages/chrome-extension/dist` and upload to Chrome Web Store.
