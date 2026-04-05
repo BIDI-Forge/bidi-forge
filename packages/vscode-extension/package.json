@@ -10,11 +10,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Tocka69/rtl-text-fixer.git"
+    "url": "https://github.com/BIDI-Forge/bidi-forge.git"
   },
-  "homepage": "https://github.com/Tocka69/rtl-text-fixer",
+  "homepage": "https://github.com/BIDI-Forge/bidi-forge",
   "bugs": {
-    "url": "https://github.com/Tocka69/rtl-text-fixer/issues"
+    "url": "https://github.com/BIDI-Forge/bidi-forge/issues"
   },
   "keywords": [
     "rtl",
