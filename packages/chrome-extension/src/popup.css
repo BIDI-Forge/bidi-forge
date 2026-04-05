@@ -58,7 +58,7 @@ body {
     radial-gradient(800px 260px at 95% 10%, color-mix(in srgb, var(--accent-2) 18%, transparent) 0%, transparent 62%),
     var(--bg);
   color: var(--text);
-  width: 340px;
+  width: 380px;
 }
 
 .app {
@@ -166,6 +166,122 @@ body {
   font-size: 11px;
   line-height: 1.35;
   color: var(--faint);
+}
+
+.scopeCard {
+  margin-top: 10px;
+}
+
+.scopeHeader {
+  padding: 12px 12px 8px;
+}
+
+.scopeHint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--faint);
+}
+
+.scopeHint strong {
+  color: var(--muted);
+  font-weight: 650;
+}
+
+.scopeOptions {
+  padding: 0 10px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.scopeOption {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 10px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  background: color-mix(in srgb, var(--surface-2) 40%, transparent);
+  cursor: pointer;
+}
+
+.scopeOption:has(input:focus-visible) {
+  outline: 2px solid color-mix(in srgb, var(--accent-2) 45%, transparent);
+  outline-offset: 1px;
+}
+
+.scopeOption input {
+  margin-top: 3px;
+  accent-color: var(--accent);
+}
+
+.scopeOptionText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.scopeOptionTitle {
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.15px;
+}
+
+.scopeOptionSub {
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--faint);
+}
+
+.hostFields {
+  padding: 0 12px 12px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
+  background: color-mix(in srgb, var(--surface-2) 65%, transparent);
+}
+
+.hostLabel {
+  display: block;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.2px;
+  color: var(--muted);
+  margin-top: 10px;
+}
+
+.hostLabelSpaced {
+  margin-top: 12px;
+}
+
+.hostTextarea {
+  width: 100%;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.4;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  resize: vertical;
+  min-height: 52px;
+}
+
+.hostTextarea::placeholder {
+  color: var(--faint);
+}
+
+.hostTextarea:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-2) 22%, transparent);
+}
+
+.hostTextarea:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 /* Switch */
