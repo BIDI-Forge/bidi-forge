@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "RTL Text Fixer",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Fix mixed Persian (RTL) and English (LTR) text readability by inserting Unicode bidi markers.",
   "action": {
     "default_title": "RTL Text Fixer",
@@ -16,7 +16,8 @@
     {
       "matches": ["<all_urls>"],
       "js": ["content.js"],
-      "run_at": "document_idle"
+      "run_at": "document_idle",
+      "all_frames": true
     }
   ]
 }
