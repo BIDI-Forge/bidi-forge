@@ -37,9 +37,57 @@
         </div>
       </section>
 
+      <section class="card scopeCard" aria-label="Site scope">
+        <div class="scopeHeader">
+          <div class="cardTitle">Where it runs</div>
+          <p class="scopeHint">
+            Use <strong>AI chat sites only</strong> to avoid touching unrelated pages. Exclusions always apply.
+          </p>
+        </div>
+
+        <div class="scopeOptions" role="radiogroup" aria-label="Site scope mode">
+          <label class="scopeOption">
+            <input type="radio" name="siteScope" value="all" />
+            <span class="scopeOptionText">
+              <span class="scopeOptionTitle">All websites</span>
+              <span class="scopeOptionSub">Same as before: every tab when enabled.</span>
+            </span>
+          </label>
+          <label class="scopeOption">
+            <input type="radio" name="siteScope" value="presets" />
+            <span class="scopeOptionText">
+              <span class="scopeOptionTitle">AI chat sites only</span>
+              <span class="scopeOptionSub">Built-in presets plus optional extra hosts below.</span>
+            </span>
+          </label>
+        </div>
+
+        <div class="hostFields">
+          <label class="hostLabel" for="includeHosts">Extra hosts (optional)</label>
+          <textarea
+            id="includeHosts"
+            class="hostTextarea"
+            rows="3"
+            spellcheck="false"
+            autocomplete="off"
+            placeholder="e.g. my-chat.example.com&#10;Or paste full URLs, one per line"
+          ></textarea>
+
+          <label class="hostLabel hostLabelSpaced" for="excludeHosts">Never run on these hosts</label>
+          <textarea
+            id="excludeHosts"
+            class="hostTextarea"
+            rows="2"
+            spellcheck="false"
+            autocomplete="off"
+            placeholder="One hostname per line (applies in both modes)"
+          ></textarea>
+        </div>
+      </section>
+
       <footer class="footer">
         <div class="sites">
-          Works best on ChatGPT, Claude, Gemini, Grok, Qwen, DeepSeek.
+          Presets include ChatGPT, Gemini, Claude, Copilot, Perplexity, DeepSeek, X/Grok, Qwen, Meta AI, and more.
         </div>
       </footer>
     </main>

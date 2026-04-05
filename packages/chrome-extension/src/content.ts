@@ -1,6 +1,13 @@
 import { fixMixedText } from "@rtl-text-fixer/core";
 
-import { getEnabled, storageKey } from "./storage.js";
+import { getExtensionRuntimeState, SYNC_SETTING_KEYS } from "./storage.js";
+import { computeEffectiveEnabled } from "./siteScope.js";
+
+/** Workspace core types load from `packages/core/dist` after build; keep a narrow boundary for ESLint. */
+function fixMixedTextSafe(text: string): string {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call -- core return is string
+  return fixMixedText(text);
+}
 
 const EDITABLE_SELECTOR = 'textarea,[contenteditable]:not([contenteditable="false"])';
 const SKIP_FIX_SELECTOR = "pre,code,script,style";
@@ -69,7 +76,10 @@ function mapOriginalOffsetToFixed(original: string, fixed: string, originalOffse
   return i;
 }
 
-type SelectionOffsets = { start: number; end: number };
+interface SelectionOffsets {
+  start: number;
+  end: number;
+}
 
 function buildTextWalker(root: Node): TreeWalker {
   const doc = root.nodeType === Node.DOCUMENT_NODE ? (root as Document) : (root.ownerDocument ?? document);
@@ -77,7 +87,7 @@ function buildTextWalker(root: Node): TreeWalker {
     acceptNode: (n: Node) => {
       if (n.nodeType !== Node.TEXT_NODE) return NodeFilter.FILTER_REJECT;
       const t = n as Text;
-      if (!t.nodeValue || !t.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+      if (!t.nodeValue?.trim()) return NodeFilter.FILTER_REJECT;
       if (isInSkippedContainer(t)) return NodeFilter.FILTER_REJECT;
       return NodeFilter.FILTER_ACCEPT;
     },
@@ -132,7 +142,7 @@ function fixTextarea(el: HTMLTextAreaElement): void {
   if (!original.trim()) return;
   if (!shouldFixText(original)) return;
 
-  const fixed = fixMixedText(original);
+  const fixed = fixMixedTextSafe(original);
   if (fixed === original) return;
 
   const start = el.selectionStart ?? 0;
@@ -170,7 +180,7 @@ function fixContentEditableRoot(root: HTMLElement): boolean {
       continue;
     }
 
-    const fixed = fixMixedText(original);
+    const fixed = fixMixedTextSafe(original);
     if (fixed === original) {
       prefixLen += originalLen;
       continue;
@@ -241,7 +251,7 @@ export function fixTextNode(textNode: Text): void {
   if (!original.trim()) return;
   if (!shouldFixText(original)) return;
 
-  const fixed = fixMixedText(original);
+  const fixed = fixMixedTextSafe(original);
   if (fixed !== original) textNode.nodeValue = fixed;
   lastProcessedText.set(textNode, textNode.nodeValue ?? "");
 }
@@ -507,20 +517,28 @@ function applyEnabled(next: boolean): void {
   }
 }
 
+function currentHostname(): string {
+  return window.location.hostname.toLowerCase();
+}
+
+async function readEffectiveEnabled(): Promise<boolean> {
+  const state = await getExtensionRuntimeState();
+  return computeEffectiveEnabled(state.enabled, currentHostname(), state.site);
+}
+
 async function init(): Promise<void> {
-  applyEnabled(await getEnabled());
+  applyEnabled(await readEffectiveEnabled());
 
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName !== "sync") return;
-    const c = changes[storageKey()];
-    if (!c) return;
-    applyEnabled(Boolean(c.newValue));
+    if (!SYNC_SETTING_KEYS.some((k) => changes[k])) return;
+    void readEffectiveEnabled().then(applyEnabled);
   });
 
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     const m = msg as ContentMessage | undefined;
     if (m?.type === "SET_ENABLED" || m?.type === "ENABLED_CHANGED") {
-      applyEnabled(Boolean(m.enabled));
+      void readEffectiveEnabled().then(applyEnabled);
       sendResponse?.({ ok: true });
       return;
     }

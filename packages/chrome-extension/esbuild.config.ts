@@ -1,10 +1,18 @@
 import esbuild from "esbuild";
 import { mkdir, readFile, writeFile, copyFile } from "node:fs/promises";
 import { watch } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const outdir = "dist";
 const isWatch = process.argv.includes("--watch");
+
+/** Bundle workspace packages from TypeScript sources so `pnpm -C packages/chrome-extension build` works without a prior `core` build. */
+const packagesDir = join(dirname(fileURLToPath(import.meta.url)), "..");
+const workspaceAliases: Record<string, string> = {
+  "@rtl-text-fixer/core": join(packagesDir, "core/src/index.ts"),
+  "@rtl-text-fixer/shared": join(packagesDir, "shared/src/index.ts"),
+};
 
 async function ensureOutDir(): Promise<void> {
   await mkdir(outdir, { recursive: true });
@@ -33,6 +41,7 @@ async function buildAll(): Promise<void> {
     target: ["chrome114"],
     outdir,
     sourcemap: true,
+    alias: workspaceAliases,
   });
 
   await esbuild.build({
@@ -42,6 +51,7 @@ async function buildAll(): Promise<void> {
     target: ["chrome114"],
     outdir,
     sourcemap: true,
+    alias: workspaceAliases,
   });
 }
 
@@ -60,6 +70,7 @@ if (isWatch) {
     target: ["chrome114"],
     outdir,
     sourcemap: true,
+    alias: workspaceAliases,
   });
 
   // Note: watch mode uses ESM for rebuild speed; run `pnpm build` before packing/loading to ensure
