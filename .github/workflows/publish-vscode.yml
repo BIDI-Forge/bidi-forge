@@ -1,0 +1,60 @@
+name: Publish VS Code Extension
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+concurrency:
+  group: publish-vscode-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: pnpm
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.5
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify tag matches extension version
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          EXT_VERSION="$(node -p "require('./packages/vscode-extension/package.json').version")"
+          EXPECTED="v${EXT_VERSION}"
+          echo "Tag: ${TAG}"
+          echo "Extension version: ${EXT_VERSION}"
+          if [ "${TAG}" != "${EXPECTED}" ]; then
+            echo "Tag must match extension version (expected ${EXPECTED})."
+            exit 1
+          fi
+
+      - name: Package VSIX
+        run: pnpm -C packages/vscode-extension package
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vscode-extension-vsix
+          path: packages/vscode-extension/*.vsix
+
+      - name: Publish to VS Code Marketplace
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: pnpm -C packages/vscode-extension exec vsce publish --no-dependencies --pat "$VSCE_PAT"
+

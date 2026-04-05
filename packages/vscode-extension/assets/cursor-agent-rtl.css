@@ -1,0 +1,30 @@
+/* RTL only for Cursor / VS Code interactive session (Agent/Chat panel). */
+
+/* Chat transcript (messages) */
+.interactive-session,
+.interactive-session .chat-message,
+.interactive-session .chat-response,
+.interactive-session .chat-message-content,
+.interactive-session .rendered-markdown,
+.interactive-session .markdown {
+  direction: rtl !important;
+  text-align: right !important;
+}
+
+/* Chat input (where you type) */
+.interactive-session textarea,
+.interactive-session input[type="text"],
+.interactive-session .monaco-editor textarea,
+.interactive-session .monaco-editor .inputarea {
+  direction: rtl !important;
+  text-align: right !important;
+  unicode-bidi: plaintext !important;
+}
+
+/* Leave code blocks LTR for readability */
+.interactive-session code,
+.interactive-session pre {
+  direction: ltr !important;
+  text-align: left !important;
+}
+

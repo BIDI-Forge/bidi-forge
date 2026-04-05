@@ -182,3 +182,14 @@ For open-source projects, the MIT License is a popular choice because it is simp
 
 - **VS Code / Cursor**: from `packages/vscode-extension` run `pnpm package` to build a `.vsix`.
 - **Chrome**: zip `packages/chrome-extension/dist` and upload to Chrome Web Store.
+
+### CI/CD (GitHub Actions) for VS Code Marketplace
+
+This repo publishes the VS Code extension when you push a version tag that matches the extension version.
+
+- **Required secret**: add a GitHub Actions repository secret named `VSCE_PAT` containing a VS Code Marketplace Personal Access Token with publish rights for publisher `amirmkazemi`.
+- **Release flow**:
+  - Bump `packages/vscode-extension/package.json` version (e.g. to `0.1.1`)
+  - Commit and push
+  - Create and push tag `v0.1.1`
+  - GitHub Actions will package a `.vsix` and publish it to the Marketplace
