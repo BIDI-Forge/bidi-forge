@@ -1,6 +1,6 @@
 {
   "name": "@rtl-text-fixer/core",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
@@ -16,7 +16,7 @@
     "dev": "tsc -p tsconfig.json --watch --preserveWatchOutput",
     "test": "pnpm vitest run",
     "test:watch": "pnpm vitest",
-    "lint": "eslint src vitest.config.ts --max-warnings=0"
+    "lint": "eslint \"src/**/*.ts\" --ignore-pattern \"src/**/__tests__/**\" --max-warnings=0"
   },
   "dependencies": {
     "@rtl-text-fixer/shared": "workspace:*"

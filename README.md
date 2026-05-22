@@ -9,13 +9,13 @@ Fix mixed Persian (RTL) and English (LTR) text readability issues by automatical
 ## Badges
 
 - **License**: MIT
-- **Version (VS Code extension)**: 0.1.0
+- **Version (VS Code extension)**: 0.2.0
 - **Stack**: TypeScript + pnpm (workspace) + Node.js 18+
 
 ## Features
 
 - **Fix mixed RTL/LTR**: inserts invisible bidi markers so text renders in the intended order.
-- **VS Code / Cursor**: fix selected text or clipboard via commands/keybindings.
+- **VS Code / Cursor**: fix selected text or clipboard; BiDi-safe notifications; settings webview; status bar; opt-in scoped RTL UI CSS.
 - **Chrome (MV3)**: fixes DOM text nodes with an enable/disable toggle (sync storage).
 - **Core engine**: reusable TypeScript function you can import in other apps.
 
@@ -23,8 +23,8 @@ Fix mixed Persian (RTL) and English (LTR) text readability issues by automatical
 
 When Persian and English are mixed, some renderers show confusing ordering. This project improves readability by inserting invisible Unicode markers:
 
-- **LRM**: `\u200E` (Left-to-Right Mark)
-- **RLM**: `\u200F` (Right-to-Left Mark)
+- **LRM / RLM**: `\u200E` / `\u200F` (direction marks for short LTR/RTL runs)
+- **LRI / RLI / FSI / PDI**: `\u2066`–`\u2069` (isolates for URLs, paths, code)
 
 Example:
 
@@ -56,7 +56,7 @@ Watch mode (build on change):
 pnpm dev
 ```
 
-Run tests (core only currently has tests):
+Run tests (core + VS Code extension unit tests):
 
 ```bash
 pnpm test
@@ -75,10 +75,10 @@ pnpm lint
 
 The core package exports:
 
-- `fixMixedText(text: string): string`
-- `detectLanguage(segment)`
-- `tokenizeText(text)`
-- `applyBidiMarkers(tokens)`
+- `fixMixedText(text, options?)` — enhanced BiDi fixing (URLs, isolates, idempotent strip/reapply)
+- `formatUiText(text, options?)` — format mixed notification/UI strings
+- `stripBidiMarkers`, `detectParagraphDirection`, `normalizeText`
+- `tokenizeText`, `applyBidiMarkers`, `detectLanguage`, `getCharClass`
 
 ### VS Code & Cursor
 
@@ -97,7 +97,7 @@ VS Code / Cursor extensions **cannot** officially flip the whole workbench UI to
 High-level steps:
 
 - Install `packages/vscode-extension/rtl-text-fixer-*.vsix`
-- Install `be5invis.vscode-custom-css`
+- Install `be5invis.vscode-custom-css` (optional; only for RTL UI)
 - Run: `RTL Fixer: فعال‌سازی RTL برای UI (با Custom CSS)`
 - Run: `Enable Custom CSS and JS` (or `Reload Custom CSS and JS`)
 - Reload window (`Developer: Reload Window`)

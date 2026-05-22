@@ -26,6 +26,11 @@ Load unpacked from `packages/chrome-extension/dist` in `chrome://extensions` (De
 
 5. **If order still looks wrong inside the box** even though markers exist: the site may force LTR on the editor. This build sets `dir="auto"` and `unicode-bidi: plaintext` on wired textareas/contenteditables so the browser can use mixed direction with those markers.
 
+### Claude: composer vs assistant reply
+
+- **Composer (input)** — wired as a contenteditable; fixes run on `input` with block-level + per-node passes.
+- **Assistant reply (main thread)** — handled by `messageSurfaces.ts`: targets `[data-testid="assistant-message"]`, `.standard-markdown`, and read-only `.ProseMirror`. Applies `unicode-bidi: plaintext` on paragraphs and coalesced marker fixes so paths like `/(marketing)/about` and mixed Persian/English lists render correctly. Fixes run after streaming finishes (`data-is-streaming` not true).
+
 6. If nothing happens, open DevTools → **Console** on that tab and check for errors; confirm the site hostname matches your scope (for **AI chat sites only**, `claude.ai` is included in presets).
 
 **Note:** Lines such as `[DatadogRUM]` or `[COMPLETION]` in the console come from the **website** (e.g. Claude), not from this extension. The content script does not log there by default.

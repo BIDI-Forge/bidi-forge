@@ -66,6 +66,9 @@ importers:
       '@rtl-text-fixer/core':
         specifier: workspace:*
         version: link:../core
+      '@rtl-text-fixer/shared':
+        specifier: workspace:*
+        version: link:../shared
     devDependencies:
       '@types/vscode':
         specifier: ^1.90.0
@@ -76,6 +79,9 @@ importers:
       esbuild:
         specifier: ^0.25.1
         version: 0.25.12
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/node@22.19.15)
 
 packages:
 

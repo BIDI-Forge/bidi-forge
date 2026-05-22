@@ -2,7 +2,7 @@
   "name": "rtl-text-fixer",
   "displayName": "RTL Text Fixer",
   "description": "Fix mixed Persian (RTL) and English (LTR) text readability by inserting Unicode bidi markers.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": false,
   "type": "module",
   "publisher": "rtl-text-fixer",
@@ -31,25 +31,39 @@
   "categories": [
     "Other"
   ],
-  "extensionDependencies": [
-    "be5invis.vscode-custom-css"
-  ],
   "activationEvents": [
     "onCommand:rtlFixer.fixSelectedText",
     "onCommand:rtlFixer.fixClipboardText",
     "onCommand:rtlFixer.enableRtlUi",
-    "onCommand:rtlFixer.disableRtlUi"
+    "onCommand:rtlFixer.disableRtlUi",
+    "onCommand:rtlFixer.openSettings"
   ],
   "main": "./dist/extension.cjs",
   "contributes": {
+    "configuration": {
+      "title": "RTL Text Fixer",
+      "properties": {
+        "rtlFixer.uiMessageDirection": {
+          "type": "string",
+          "enum": ["rtl", "ltr", "auto"],
+          "default": "rtl",
+          "description": "Base direction for extension notification messages."
+        },
+        "rtlFixer.fixOnPaste": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically fix mixed text on paste (reserved; not yet implemented)."
+        }
+      }
+    },
     "commands": [
       {
         "command": "rtlFixer.fixSelectedText",
-        "title": "RTL Fixer: ‏اصلاح متن انتخاب‌شده"
+        "title": "RTL Fixer: اصلاح متن انتخاب‌شده"
       },
       {
         "command": "rtlFixer.fixClipboardText",
-        "title": "RTL Fixer: ‏اصلاح متن کلیپ‌بورد"
+        "title": "RTL Fixer: اصلاح متن کلیپ‌بورد"
       },
       {
         "command": "rtlFixer.enableRtlUi",
@@ -58,6 +72,10 @@
       {
         "command": "rtlFixer.disableRtlUi",
         "title": "RTL Fixer: غیرفعال‌سازی RTL برای UI (با Custom CSS)"
+      },
+      {
+        "command": "rtlFixer.openSettings",
+        "title": "RTL Fixer: تنظیمات و راهنما"
       }
     ],
     "keybindings": [
@@ -78,16 +96,19 @@
   "scripts": {
     "build": "node esbuild.config.ts",
     "dev": "node esbuild.config.ts --watch",
-    "lint": "eslint src esbuild.config.ts --max-warnings=0",
+    "test": "vitest run",
+    "lint": "eslint \"src/**/*.ts\" esbuild.config.ts --ignore-pattern \"src/**/__tests__/**\" --max-warnings=0",
     "package": "pnpm build && vsce package --no-dependencies",
     "publish": "pnpm build && vsce publish --no-dependencies"
   },
   "dependencies": {
-    "@rtl-text-fixer/core": "workspace:*"
+    "@rtl-text-fixer/core": "workspace:*",
+    "@rtl-text-fixer/shared": "workspace:*"
   },
   "devDependencies": {
     "@types/vscode": "^1.90.0",
     "@vscode/vsce": "^3.7.1",
-    "esbuild": "^0.25.1"
+    "esbuild": "^0.25.1",
+    "vitest": "^3.2.4"
   }
 }

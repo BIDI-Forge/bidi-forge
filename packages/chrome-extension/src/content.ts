@@ -1,12 +1,11 @@
-import { fixMixedText } from "@rtl-text-fixer/core";
+import { fixMixedText, stripBidiMarkers as stripBidiMarkersCore } from "@rtl-text-fixer/core";
 
 import { hookShadowRootsInTree, querySelectorAllDeepFrom } from "./domDeep.js";
+import { scanMessageSurfaces, scanMessageSurfacesFromElement } from "./messageSurfaces.js";
 import { getExtensionRuntimeState, SYNC_SETTING_KEYS } from "./storage.js";
 import { computeEffectiveEnabled } from "./siteScope.js";
 
-/** Workspace core types load from `packages/core/dist` after build; keep a narrow boundary for ESLint. */
 function fixMixedTextSafe(text: string): string {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call -- core return is string
   return fixMixedText(text);
 }
 
@@ -56,7 +55,7 @@ function isBidiMarker(ch: string): boolean {
 
 /** DOM `innerText` follows visual order in mixed RTL/LTR; fixing that string corrupts text. Always strip old markers before re-tokenizing. */
 function stripBidiMarkers(s: string): string {
-  return s.replace(/\u200E|\u200F/g, "");
+  return stripBidiMarkersCore(s);
 }
 
 function mapOriginalOffsetToFixed(original: string, fixed: string, originalOffset: number): number {
@@ -515,6 +514,7 @@ function scanSubtreeFromElement(el: Element): void {
   if (!enabled) return;
   if (isInSkippedContainer(el)) return;
   walkAndFix(el);
+  scanMessageSurfacesFromElement(el, currentHostname());
   for (const node of querySelectorAllDeepFrom(el, EDITABLE_SELECTOR)) ensureEditableWired(node);
   hookShadowRootsInTree(el, (sr) => ensureObserverForShadowRoot(sr));
   for (const iframe of el.querySelectorAll("iframe")) tryInitIframe(iframe as HTMLIFrameElement);
@@ -524,6 +524,7 @@ export function scanDocument(doc: Document): void {
   if (!enabled) return;
   if (!doc.body) return;
   walkAndFix(doc.body);
+  scanMessageSurfaces(doc, currentHostname());
 
   for (const el of querySelectorAllDeepFrom(doc, EDITABLE_SELECTOR)) ensureEditableWired(el);
 

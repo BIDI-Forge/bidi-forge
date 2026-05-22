@@ -1,73 +1,73 @@
 /*
-  RTL Workbench UI stylesheet (opt-in).
-  Intended to be injected by be5invis.vscode-custom-css.
+  RTL Workbench UI stylesheet v2 (opt-in).
+  Injected via be5invis.vscode-custom-css.
+  Scoped layout RTL; mixed-text areas use plaintext/auto.
 */
 
-/* Flip overall workbench layout to RTL */
-body,
-.monaco-workbench,
-.monaco-workbench .part,
+/* Layout chrome: RTL without flipping entire body */
 .monaco-workbench .activitybar,
 .monaco-workbench .sidebar,
 .monaco-workbench .panel,
 .monaco-workbench .statusbar,
-.monaco-workbench .titlebar,
-.monaco-workbench .editor-group-container,
-.monaco-workbench .composite {
+.monaco-workbench .titlebar {
   direction: rtl !important;
 }
 
-/* Align typical UI text to the right */
 .monaco-workbench .monaco-list-row,
-.monaco-workbench .monaco-list-row .monaco-icon-label,
 .monaco-workbench .monaco-icon-label .label-name,
-.monaco-workbench .monaco-icon-label .label-description,
-.monaco-workbench .pane-header,
 .monaco-workbench .pane-header .title,
 .monaco-workbench .panel .panel-title,
-.monaco-workbench .statusbar-item,
-.monaco-workbench .action-label,
-.monaco-workbench .inputbox,
-.monaco-workbench .quick-input-widget,
-.monaco-workbench .quick-input-widget .quick-input-titlebar,
-.monaco-workbench .quick-input-widget .quick-input-list {
+.monaco-workbench .statusbar-item {
   text-align: right !important;
 }
 
-/* Fix common flex containers so icons stay visually consistent */
-.monaco-workbench .monaco-icon-label,
-.monaco-workbench .action-item,
-.monaco-workbench .action-label {
+/* Mixed-script UI: let Unicode marks and plain text resolve order */
+.notifications-toasts,
+.notification-toast,
+.notification-toast .notification-list-item-message,
+.monaco-dialog-box,
+.monaco-dialog-box .dialog-message,
+.settings-editor,
+.settings-header,
+.monaco-workbench .quick-input-widget .quick-input-list .monaco-list-row {
+  direction: auto !important;
+  unicode-bidi: plaintext !important;
+  text-align: start !important;
+}
+
+/* Quick input: auto direction for paths/URLs in Persian UI */
+.monaco-workbench .quick-input-widget input {
+  direction: auto !important;
+  unicode-bidi: plaintext !important;
+  text-align: start !important;
+}
+
+.monaco-workbench .quick-input-widget .quick-input-titlebar {
+  direction: rtl !important;
+  text-align: right !important;
+}
+
+/* Targeted flex: sidebar rows only (avoid global action-label reverse) */
+.monaco-workbench .sidebar .monaco-icon-label-container {
   flex-direction: row-reverse !important;
 }
 
-/* Put scrollbar on left in lists (optional, improves RTL feel) */
-.monaco-workbench .monaco-list,
-.monaco-workbench .monaco-table,
-.monaco-workbench .monaco-scrollable-element {
-  direction: rtl !important;
-}
-
-/* EXCEPTIONS: keep code editor / terminal / code blocks LTR */
+/* EXCEPTIONS: editor, terminal, hovers, code — stay LTR */
 .monaco-editor,
 .monaco-diff-editor,
 .monaco-editor .view-lines,
 .monaco-editor .view-line,
 .monaco-editor .margin,
 .monaco-editor .minimap,
-.monaco-editor .monaco-scrollable-element,
 .monaco-editor .inputarea,
 .monaco-editor .find-widget,
 .monaco-editor .suggest-widget,
-.monaco-editor .parameter-hints-widget,
-.monaco-editor .rename-box,
 .editor-widget,
 .debug-hover-widget,
 .monaco-hover,
 .monaco-hover .markdown-hover,
 .monaco-hover code,
 .monaco-hover pre,
-.monaco-hover .code,
 .xterm,
 .xterm-screen,
 .terminal-outer-container,
@@ -76,21 +76,27 @@ body,
 .terminal {
   direction: ltr !important;
   text-align: left !important;
+  unicode-bidi: normal !important;
 }
 
-/* Ensure inline code and paths in UI remain LTR for readability */
 code,
 pre,
-.monaco-workbench .monaco-icon-label .label-description .path,
-.monaco-workbench .file-uri,
 .monaco-workbench .monaco-breadcrumbs,
 .monaco-workbench .monaco-breadcrumbs .breadcrumb-item {
   direction: ltr !important;
+  unicode-bidi: isolate !important;
 }
 
-/* Quick input: keep text box usable in RTL */
-.monaco-workbench .quick-input-widget input {
-  direction: rtl !important;
-  text-align: right !important;
+/* --- Cursor-specific (best-effort; DOM may change between releases) --- */
+.aichat-panel,
+.aichat-panel .aislash-editor-input,
+.aichat-panel [contenteditable="true"],
+.composer-bar,
+.composer-bar [contenteditable="true"],
+.chat-input-container,
+.chat-input-container textarea,
+.chat-input-container [contenteditable="true"] {
+  direction: auto !important;
+  unicode-bidi: plaintext !important;
+  text-align: start !important;
 }
-
