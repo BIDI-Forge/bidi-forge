@@ -5,10 +5,9 @@
 
 import { fixMixedText, stripBidiMarkers } from "@rtl-text-fixer/core";
 
+import { fixBlockCoalescedTextNodes, shouldFixMixedText } from "./blockFix.js";
 import { querySelectorAllDeepFrom } from "./domDeep.js";
-
-const PERSIAN_RE = /[\u0600-\u06FF]/;
-const ENGLISH_RE = /[a-zA-Z]/;
+import { isGeminiHost, isInsideGeminiComposer } from "./geminiQuill.js";
 
 const EDITABLE_SELECTOR =
   '[contenteditable="true"],textarea,[role="textbox"][contenteditable="true"]';
@@ -25,6 +24,15 @@ const CLAUDE_MESSAGE_ROOTS = [
 /** ProseMirror output that is not the live composer. */
 const GENERIC_READONLY_PROSE = '.ProseMirror:not([contenteditable="true"])';
 
+/** Gemini assistant output — avoid `.ProseMirror` (matches the live Quill composer). */
+const GEMINI_MESSAGE_ROOTS = [
+  ".markdown",
+  ".message-content",
+  '[class*="model-response"]',
+  '[class*="response-container"]',
+  "message-content",
+];
+
 const hintedRoots = new WeakSet<HTMLElement>();
 const lastRootSignature = new WeakMap<HTMLElement, string>();
 
@@ -34,6 +42,7 @@ export function isClaudeLikeHost(hostname: string): boolean {
 }
 
 export function getMessageRootSelectors(hostname: string): string[] {
+  if (isGeminiHost(hostname)) return GEMINI_MESSAGE_ROOTS;
   if (isClaudeLikeHost(hostname)) {
     return [...CLAUDE_MESSAGE_ROOTS, GENERIC_READONLY_PROSE];
   }
@@ -41,7 +50,7 @@ export function getMessageRootSelectors(hostname: string): string[] {
 }
 
 function shouldFixText(text: string): boolean {
-  return PERSIAN_RE.test(text) && ENGLISH_RE.test(text);
+  return shouldFixMixedText(text);
 }
 
 function isInsideEditable(el: Element): boolean {
@@ -74,27 +83,6 @@ function applyReaderBidiStack(root: HTMLElement): void {
   }
 }
 
-function fixBlockCoalescedTextNodes(block: HTMLElement, fixed: string): boolean {
-  const doc = block.ownerDocument;
-  const walker = doc.createTreeWalker(block, NodeFilter.SHOW_TEXT, {
-    acceptNode: (n) => {
-      const t = n as Text;
-      if (!t.nodeValue?.trim()) return NodeFilter.FILTER_REJECT;
-      if (t.parentElement?.closest("pre, code, kbd, samp")) return NodeFilter.FILTER_REJECT;
-      return NodeFilter.FILTER_ACCEPT;
-    },
-  });
-
-  const nodes: Text[] = [];
-  let n: Node | null;
-  while ((n = walker.nextNode())) nodes.push(n as Text);
-  if (nodes.length === 0) return false;
-
-  nodes[0]!.nodeValue = fixed;
-  for (let i = 1; i < nodes.length; i++) nodes[i]!.nodeValue = "";
-  return true;
-}
-
 function fixReadOnlyBlock(block: HTMLElement): boolean {
   if (block.closest("pre")) return false;
   if (block.matches("pre, code, kbd, samp")) return false;
@@ -119,8 +107,10 @@ function isStillStreaming(root: HTMLElement): boolean {
   return streaming instanceof HTMLElement;
 }
 
-function processMessageRoot(root: HTMLElement): void {
+function processMessageRoot(root: HTMLElement, hostname: string): void {
   if (isInsideEditable(root)) return;
+  if (isInsideGeminiComposer(root, hostname)) return;
+  if (root.closest("rich-textarea, .ql-container, .ql-editor")) return;
   if (isStillStreaming(root)) return;
 
   if (!hintedRoots.has(root)) {
@@ -155,7 +145,8 @@ export function scanMessageSurfaces(doc: Document, hostname: string): void {
       if (seen.has(el)) continue;
       seen.add(el);
       if (isInsideEditable(el)) continue;
-      processMessageRoot(el);
+      if (isInsideGeminiComposer(el, hostname)) continue;
+      processMessageRoot(el, hostname);
     }
   }
 }
@@ -165,12 +156,21 @@ export function scanMessageSurfacesFromElement(el: Element, hostname: string): v
   if (!doc) return;
   const selectors = getMessageRootSelectors(hostname);
   for (const sel of selectors) {
-    if (el.matches(sel) && el instanceof HTMLElement && !isInsideEditable(el)) {
-      processMessageRoot(el);
+    if (
+      el.matches(sel) &&
+      el instanceof HTMLElement &&
+      !isInsideEditable(el) &&
+      !isInsideGeminiComposer(el, hostname)
+    ) {
+      processMessageRoot(el, hostname);
     }
     for (const found of el.querySelectorAll(sel)) {
-      if (found instanceof HTMLElement && !isInsideEditable(found)) {
-        processMessageRoot(found);
+      if (
+        found instanceof HTMLElement &&
+        !isInsideEditable(found) &&
+        !isInsideGeminiComposer(found, hostname)
+      ) {
+        processMessageRoot(found, hostname);
       }
     }
   }

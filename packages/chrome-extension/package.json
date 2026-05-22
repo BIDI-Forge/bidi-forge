@@ -1,10 +1,12 @@
 {
   "name": "@rtl-text-fixer/chrome-extension",
-  "version": "0.2.0",
+  "version": "0.3.4",
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "node esbuild.config.ts",
+    "icons": "node scripts/generate-icons.mjs",
+    "build": "node scripts/generate-icons.mjs && node esbuild.config.ts",
+    "pack:store": "pnpm build && node scripts/pack-store-zip.mjs",
     "dev": "node esbuild.config.ts --watch",
     "lint": "eslint src esbuild.config.ts --max-warnings=0"
   },

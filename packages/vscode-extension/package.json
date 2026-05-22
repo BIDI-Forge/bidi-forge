@@ -2,10 +2,10 @@
   "name": "rtl-text-fixer",
   "displayName": "RTL Text Fixer",
   "description": "Fix mixed Persian (RTL) and English (LTR) text readability by inserting Unicode bidi markers.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": false,
   "type": "module",
-  "publisher": "rtl-text-fixer",
+  "publisher": "Tocka69",
   "icon": "icon.png",
   "license": "MIT",
   "repository": {

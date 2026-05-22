@@ -18,10 +18,27 @@ async function ensureOutDir(): Promise<void> {
   await mkdir(outdir, { recursive: true });
 }
 
+async function copyIcons(): Promise<void> {
+  const iconsSrc = "icons";
+  const iconsDest = join(outdir, "icons");
+  await mkdir(iconsDest, { recursive: true });
+  const { readdir } = await import("node:fs/promises");
+  try {
+    for (const name of await readdir(iconsSrc)) {
+      if (name.endsWith(".png")) {
+        await copyFile(join(iconsSrc, name), join(iconsDest, name));
+      }
+    }
+  } catch {
+    console.warn("[chrome-extension] icons/ missing — run: pnpm icons");
+  }
+}
+
 async function copyStatic(): Promise<void> {
   await ensureOutDir();
   await copyFile("src/popup.html", join(outdir, "popup.html"));
   await copyFile("src/popup.css", join(outdir, "popup.css"));
+  await copyIcons();
 
   const manifestRaw = await readFile("src/manifest.json", "utf8");
   const manifest = JSON.parse(manifestRaw) as Record<string, unknown>;
