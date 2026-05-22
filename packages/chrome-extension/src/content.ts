@@ -1,6 +1,14 @@
 import { fixMixedText, stripBidiMarkers as stripBidiMarkersCore } from "@rtl-text-fixer/core";
 
+import { tryFixMixedBlockCoalesced } from "./blockFix.js";
 import { hookShadowRootsInTree, querySelectorAllDeepFrom } from "./domDeep.js";
+import {
+  applyGeminiQuillBidiOverrides,
+  isGeminiQuillComposer,
+  isGoogleAiHost,
+  maintainGeminiComposer,
+  resolveGeminiQuillEditor,
+} from "./geminiQuill.js";
 import { scanMessageSurfaces, scanMessageSurfacesFromElement } from "./messageSurfaces.js";
 import { getExtensionRuntimeState, SYNC_SETTING_KEYS } from "./storage.js";
 import { computeEffectiveEnabled } from "./siteScope.js";
@@ -12,6 +20,9 @@ function fixMixedTextSafe(text: string): string {
 const EDITABLE_SELECTOR =
   'textarea,[contenteditable]:not([contenteditable="false"]),[role="textbox"][contenteditable]:not([contenteditable="false"])';
 const SKIP_FIX_SELECTOR = "pre,code,script,style";
+const COMPOSER_INPUT_DEBOUNCE_MS = 450;
+const GEMINI_MAINTAIN_DEBOUNCE_MS = 280;
+const COMPOSER_AFTER_ENTER_GRACE_MS = 750;
 
 const PERSIAN_RE = /[\u0600-\u06FF]/;
 const ENGLISH_RE = /[a-zA-Z]/;
@@ -86,63 +97,6 @@ function mapOriginalOffsetToFixed(original: string, fixed: string, originalOffse
   return i;
 }
 
-interface SelectionOffsets {
-  start: number;
-  end: number;
-}
-
-function buildTextWalker(root: Node): TreeWalker {
-  const doc = root.nodeType === Node.DOCUMENT_NODE ? (root as Document) : (root.ownerDocument ?? document);
-  return doc.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-    acceptNode: (n: Node) => {
-      if (n.nodeType !== Node.TEXT_NODE) return NodeFilter.FILTER_REJECT;
-      const t = n as Text;
-      if (!t.nodeValue?.trim()) return NodeFilter.FILTER_REJECT;
-      if (isInSkippedContainer(t)) return NodeFilter.FILTER_REJECT;
-      return NodeFilter.FILTER_ACCEPT;
-    },
-  });
-}
-
-function selectionTextOffsetsWithin(root: HTMLElement): SelectionOffsets | undefined {
-  const sel = root.ownerDocument.getSelection?.();
-  if (!sel || sel.rangeCount === 0) return undefined;
-
-  const range = sel.getRangeAt(0);
-  if (!root.contains(range.startContainer) || !root.contains(range.endContainer)) return undefined;
-
-  const startRange = root.ownerDocument.createRange();
-  startRange.setStart(root, 0);
-  startRange.setEnd(range.startContainer, range.startOffset);
-  const start = startRange.toString().length;
-
-  const endRange = root.ownerDocument.createRange();
-  endRange.setStart(root, 0);
-  endRange.setEnd(range.endContainer, range.endOffset);
-  const end = endRange.toString().length;
-
-  return { start, end };
-}
-
-function findTextPointAtOffset(
-  root: HTMLElement,
-  textOffset: number,
-): { node: Text; offset: number } | undefined {
-  const walker = buildTextWalker(root);
-  let remaining = Math.max(0, textOffset);
-
-  let n: Node | null;
-  while ((n = walker.nextNode())) {
-    const t = n as Text;
-    const len = t.nodeValue?.length ?? 0;
-    if (remaining <= len) return { node: t, offset: remaining };
-    remaining -= len;
-  }
-
-  // No text nodes; fallback to placing caret at end.
-  return undefined;
-}
-
 function shouldFixText(text: string): boolean {
   return isMixedPersianEnglish(text);
 }
@@ -157,27 +111,21 @@ function comparableLogicalText(el: Element): string {
  * Many AI chat UIs set `direction: ltr` on the editor; LRM/RLM then do almost nothing visually.
  * `!important` beats strong site CSS; see `applyShadowHostBidiHintsFrom` for Google’s shadow-wrapped composers.
  */
+const bidiHintsApplied = new WeakSet<HTMLElement>();
+const shadowBidiHintsApplied = new WeakSet<HTMLElement>();
+
 function applyComposerBidiHint(host: HTMLElement): void {
   const ok =
     host instanceof HTMLTextAreaElement || (host instanceof HTMLElement && host.isContentEditable);
-  if (!ok) return;
+  if (!ok || bidiHintsApplied.has(host)) return;
+  bidiHintsApplied.add(host);
   host.setAttribute("dir", "auto");
   host.style.setProperty("unicode-bidi", "plaintext", "important");
   host.style.setProperty("direction", "auto", "important");
 }
 
 function isLikelyGoogleAiSurface(hostname: string): boolean {
-  const h = hostname.toLowerCase();
-  return (
-    h === "gemini.google.com" ||
-    h.endsWith(".gemini.google.com") ||
-    h.includes("bard.google") ||
-    h === "ogs.google.com" ||
-    h.endsWith(".ogs.google.com") ||
-    h === "notebooklm.google.com" ||
-    h === "aistudio.google.com" ||
-    h === "labs.google.com"
-  );
+  return isGoogleAiHost(hostname);
 }
 
 /** Gemini / Bard often nest the field in open shadow trees whose hosts force LTR. */
@@ -187,7 +135,8 @@ function applyShadowHostBidiHintsFrom(leaf: HTMLElement): void {
     const parent: Node | null = n.parentNode;
     if (parent instanceof ShadowRoot) {
       const hostEl = parent.host;
-      if (hostEl instanceof HTMLElement) {
+      if (hostEl instanceof HTMLElement && !shadowBidiHintsApplied.has(hostEl)) {
+        shadowBidiHintsApplied.add(hostEl);
         hostEl.style.setProperty("unicode-bidi", "plaintext", "important");
         hostEl.style.setProperty("direction", "auto", "important");
       }
@@ -203,87 +152,15 @@ function applyShadowHostBidiHintsFrom(leaf: HTMLElement): void {
  * Gemini uses Quill: `<rich-textarea class="ql-container">` wraps `.ql-editor` and Angular wrappers.
  * Parent flex rows can stay LTR while we force `text-align: start` + bidi on the editor and each `<p>`.
  */
-function applyQuillGeminiBidiStack(field: HTMLElement): void {
-  const qc = field.closest(".ql-container");
-  if (qc instanceof HTMLElement) {
-    qc.setAttribute("dir", "auto");
-    qc.style.setProperty("unicode-bidi", "plaintext", "important");
-    qc.style.setProperty("direction", "auto", "important");
-  }
-  const rt = field.closest("rich-textarea");
-  if (rt instanceof HTMLElement && rt !== qc) {
-    rt.setAttribute("dir", "auto");
-    rt.style.setProperty("unicode-bidi", "plaintext", "important");
-    rt.style.setProperty("direction", "auto", "important");
-  }
-
-  const editor = field.closest(".ql-editor");
-  if (editor instanceof HTMLElement) {
-    editor.setAttribute("dir", "auto");
-    editor.style.setProperty("unicode-bidi", "plaintext", "important");
-    editor.style.setProperty("direction", "auto", "important");
-    editor.style.setProperty("text-align", "start", "important");
-    for (const p of editor.querySelectorAll("p")) {
-      if (p instanceof HTMLElement) {
-        p.setAttribute("dir", "auto");
-        p.style.setProperty("unicode-bidi", "plaintext", "important");
-        p.style.setProperty("direction", "auto", "important");
-        p.style.setProperty("text-align", "start", "important");
-      }
-    }
-  }
-
-  const block = field.closest(".text-input-field");
-  if (block instanceof HTMLElement) {
-    for (const sel of [
-      ".text-input-field_textarea-wrapper",
-      ".text-input-field-main-area",
-      ".text-input-field_textarea-inner",
-    ]) {
-      const n = block.querySelector(sel);
-      if (n instanceof HTMLElement) {
-        n.style.setProperty("unicode-bidi", "plaintext", "important");
-        n.style.setProperty("direction", "auto", "important");
-      }
-    }
-    block.style.setProperty("unicode-bidi", "plaintext", "important");
-    block.style.setProperty("direction", "auto", "important");
-  }
-
-  queueMicrotask(() => {
-    if (qc instanceof HTMLElement) {
-      qc.style.setProperty("direction", "auto", "important");
-      qc.style.setProperty("unicode-bidi", "plaintext", "important");
-    }
-    if (editor instanceof HTMLElement) {
-      editor.style.setProperty("direction", "auto", "important");
-      editor.style.setProperty("text-align", "start", "important");
-    }
-  });
-}
-
 function applyComposerBidiHintsForSurface(el: HTMLElement): void {
-  applyComposerBidiHint(el);
-  if (el.closest(".ql-container")) applyQuillGeminiBidiStack(el);
-  if (isLikelyGoogleAiSurface(window.location.hostname)) applyShadowHostBidiHintsFrom(el);
-}
-
-/**
- * ProseMirror/React editors revert raw DOM writes; `execCommand("insertText")` goes through the browser
- * input path and is usually accepted as a user edit (see e.g. ChatGPT/Claude-style composers).
- */
-function findContentEditableHost(from: HTMLElement): HTMLElement | null {
-  let el: HTMLElement | null = from;
-  while (el) {
-    if (el.isContentEditable) return el;
-    const parent = el.parentNode;
-    if (parent instanceof ShadowRoot) {
-      el = parent.host as HTMLElement;
-      continue;
-    }
-    el = el.parentElement;
+  const host = currentHostname();
+  if (isGeminiQuillComposer(host, el)) {
+    applyGeminiQuillBidiOverrides(el);
+    if (isLikelyGoogleAiSurface(host)) applyShadowHostBidiHintsFrom(el);
+    return;
   }
-  return null;
+  applyComposerBidiHint(el);
+  if (isLikelyGoogleAiSurface(host)) applyShadowHostBidiHintsFrom(el);
 }
 
 function firstEditableAncestor(start: EventTarget | null): Element | null {
@@ -301,52 +178,6 @@ function firstEditableAncestor(start: EventTarget | null): Element | null {
     n = parent;
   }
   return null;
-}
-
-function replaceEditableRangeWithInsertText(
-  host: HTMLElement,
-  target: HTMLElement,
-  fixed: string,
-): void {
-  const doc = host.ownerDocument;
-  const win = doc.defaultView;
-  if (!win) {
-    target.textContent = fixed;
-    return;
-  }
-  host.focus();
-  const sel = win.getSelection();
-  if (!sel) {
-    target.textContent = fixed;
-    return;
-  }
-  const range = doc.createRange();
-  range.selectNodeContents(target);
-  sel.removeAllRanges();
-  sel.addRange(range);
-  if (!doc.execCommand("insertText", false, fixed)) {
-    target.textContent = fixed;
-  }
-}
-
-/**
- * ProseMirror-style editors split RTL/LTR across sibling spans; per–text-node fixes never see both scripts.
- * Fix the whole block when safe; prefer insertText so the editor keeps a consistent document.
- */
-function tryFixBlockPlainText(block: HTMLElement): boolean {
-  if (isInSkippedContainer(block)) return false;
-  if (block.querySelector("pre, code, kbd, samp, a[href]")) return false;
-  const raw = stripBidiMarkers(block.textContent ?? "");
-  if (!raw.trim()) return false;
-  if (!shouldFixText(raw)) return false;
-  const fixed = fixMixedTextSafe(raw);
-  if (fixed === raw) return false;
-  const beforeTc = block.textContent ?? "";
-  const host = findContentEditableHost(block);
-  if (host) replaceEditableRangeWithInsertText(host, block, fixed);
-  else block.textContent = fixed;
-  if ((block.textContent ?? "") === beforeTc) return false;
-  return true;
 }
 
 function walkTextNodesDeep(start: Element, handle: (t: Text) => void): void {
@@ -391,91 +222,61 @@ function fixTextarea(el: HTMLTextAreaElement): void {
   }
 }
 
-function fixContentEditableRoot(root: HTMLElement): boolean {
+function getCaretBlock(root: HTMLElement): HTMLElement | null {
+  const sel = root.ownerDocument.getSelection?.();
+  if (!sel || sel.rangeCount === 0) return null;
+  const anchor = sel.anchorNode;
+  if (!anchor || !root.contains(anchor)) return null;
+  const el = closestElement(anchor);
+  if (!el) return null;
+  const block = el.closest("p, li, [data-block], div[role='paragraph']");
+  if (block instanceof HTMLElement && root.contains(block)) return block;
+  return root;
+}
+
+function listComposerBlocks(root: HTMLElement): HTMLElement[] {
+  const blocks: HTMLElement[] = [];
+  for (const p of root.querySelectorAll("p")) {
+    if (p instanceof HTMLElement) blocks.push(p);
+  }
+  if (blocks.length > 0) return blocks;
+  for (const child of root.children) {
+    if (child instanceof HTMLElement && child.tagName === "DIV") blocks.push(child);
+  }
+  if (blocks.length === 0) blocks.push(root);
+  return blocks;
+}
+
+function fixContentEditableRoot(root: HTMLElement, mode: "typing" | "full" = "typing"): boolean {
   if (!root.isContentEditable) return false;
   if (isInSkippedContainer(root)) return false;
 
-  root.normalize();
-
-  let blockChanged = false;
-  for (const p of root.querySelectorAll("p")) {
-    if (p instanceof HTMLElement && tryFixBlockPlainText(p)) blockChanged = true;
-  }
-  if (root.querySelectorAll("p").length === 0) {
-    for (const child of root.children) {
-      if (child instanceof HTMLElement && child.tagName === "DIV" && tryFixBlockPlainText(child)) {
-        blockChanged = true;
-      }
-    }
-    if (root.childElementCount === 0 && tryFixBlockPlainText(root)) blockChanged = true;
+  const host = currentHostname();
+  if (isGeminiQuillComposer(host, root)) {
+    applyGeminiQuillBidiOverrides(root);
+    if (mode === "typing") return false;
+    const editor = resolveGeminiQuillEditor(root);
+    if (editor) maintainGeminiComposer(editor);
+    return true;
   }
 
-  const selection = selectionTextOffsetsWithin(root);
-  let nextSelection: SelectionOffsets | undefined = selection ? { ...selection } : undefined;
+  const blocks =
+    mode === "typing"
+      ? (() => {
+          const caret = getCaretBlock(root);
+          return caret ? [caret] : [];
+        })()
+      : listComposerBlocks(root);
 
-  const walker = buildTextWalker(root);
-  let n: Node | null;
-  let prefixLen = 0; // length in the *current* (mutating) text stream
   let changed = false;
-
-  while ((n = walker.nextNode())) {
-    const t = n as Text;
-    const original = t.nodeValue ?? "";
-    const originalLen = original.length;
-    const logical = stripBidiMarkers(original);
-
-    if (!shouldFixText(logical)) {
-      prefixLen += originalLen;
-      continue;
-    }
-
-    const fixed = fixMixedTextSafe(logical);
-    if (fixed === original) {
-      prefixLen += originalLen;
-      continue;
-    }
-
-    // Map selection offsets through this node’s change.
-    if (nextSelection) {
-      const mapOffset = (globalOffset: number): number => {
-        const local = globalOffset - prefixLen;
-        if (local < 0) return globalOffset; // before this node
-        if (local > originalLen) return globalOffset + (fixed.length - originalLen); // after this node
-        const mappedLocal = mapOriginalOffsetToFixed(original, fixed, local);
-        return prefixLen + mappedLocal;
-      };
-      nextSelection = {
-        start: mapOffset(nextSelection.start),
-        end: mapOffset(nextSelection.end),
-      };
-    }
-
-    t.nodeValue = fixed;
-    changed = true;
-    prefixLen += fixed.length;
+  for (const block of blocks) {
+    if (tryFixMixedBlockCoalesced(block)) changed = true;
   }
 
-  if (!changed && !blockChanged) return false;
-
-  if (nextSelection) {
-    const startPoint = findTextPointAtOffset(root, nextSelection.start);
-    const endPoint = findTextPointAtOffset(root, nextSelection.end) ?? startPoint;
-    if (startPoint && endPoint) {
-      const sel = root.ownerDocument.getSelection?.();
-      if (sel) {
-        const r = root.ownerDocument.createRange();
-        r.setStart(startPoint.node, startPoint.offset);
-        r.setEnd(endPoint.node, endPoint.offset);
-        sel.removeAllRanges();
-        sel.addRange(r);
-      }
-    }
-  }
-
-  return true;
+  return changed;
 }
 
-export function fixInputElement(el: Element): void {
+export function fixInputElement(el: Element, mode: "typing" | "full" = "typing"): void {
   if (!enabled) return;
   if (!isEditableElement(el)) return;
   if (isInSkippedContainer(el)) return;
@@ -486,7 +287,7 @@ export function fixInputElement(el: Element): void {
   }
 
   if (!(el instanceof HTMLElement)) return;
-  fixContentEditableRoot(el);
+  fixContentEditableRoot(el, mode);
 }
 
 export function fixTextNode(textNode: Text): void {
@@ -513,6 +314,7 @@ function walkAndFix(root: Node): void {
 function scanSubtreeFromElement(el: Element): void {
   if (!enabled) return;
   if (isInSkippedContainer(el)) return;
+  if (isEditableElement(el) || isInsideEditable(el)) return;
   walkAndFix(el);
   scanMessageSurfacesFromElement(el, currentHostname());
   for (const node of querySelectorAllDeepFrom(el, EDITABLE_SELECTOR)) ensureEditableWired(node);
@@ -554,6 +356,8 @@ const programmaticEdit = new WeakSet<Element>();
 /** Normalized logical text (bidi markers stripped) to avoid re-entrant fixes and innerText vs marker drift. */
 const lastAppliedComparableText = new WeakMap<Element, string>();
 const scheduledInputFix = new WeakMap<Element, number>();
+const skipComposerFixUntil = new WeakMap<Element, number>();
+const composerScheduleByEditable = new WeakMap<Element, () => void>();
 const lastProcessedText = new WeakMap<Text, string>();
 
 function requestIdle(cb: () => void, timeoutMs: number): number | undefined {
@@ -633,44 +437,121 @@ function flushQueue(): void {
   if (queued.size > 0) scheduleFlush();
 }
 
+function wireGeminiComposerEditable(el: Element): void {
+  if (!(el instanceof HTMLElement)) return;
+  applyComposerBidiHintsForSurface(el);
+
+  const editor = resolveGeminiQuillEditor(el);
+  const scheduleMaintain = () => {
+    if (!enabled) return;
+    if (programmaticEdit.has(el)) return;
+    if (composing.get(el)) return;
+    if (Date.now() < (skipComposerFixUntil.get(el) ?? 0)) return;
+
+    const prev = scheduledInputFix.get(el);
+    if (prev !== undefined) window.clearTimeout(prev);
+    const id = window.setTimeout(() => {
+      scheduledInputFix.delete(el);
+      const ed = resolveGeminiQuillEditor(el);
+      if (ed) maintainGeminiComposer(ed);
+      else if (el instanceof HTMLElement) applyGeminiQuillBidiOverrides(el);
+    }, GEMINI_MAINTAIN_DEBOUNCE_MS);
+    scheduledInputFix.set(el, id);
+  };
+
+  composerScheduleByEditable.set(el, scheduleMaintain);
+
+  el.addEventListener("compositionstart", () => composing.set(el, true), { passive: true });
+  el.addEventListener("compositionend", () => {
+    composing.set(el, false);
+    scheduleMaintain();
+  });
+  el.addEventListener("input", scheduleMaintain, { passive: true, capture: true });
+  el.addEventListener(
+    "paste",
+    () => {
+      window.setTimeout(() => {
+        if (!enabled || programmaticEdit.has(el)) return;
+        const ed = resolveGeminiQuillEditor(el);
+        if (ed) maintainGeminiComposer(ed);
+      }, 0);
+    },
+    { passive: true },
+  );
+  el.addEventListener(
+    "keydown",
+    (ev) => {
+      if (ev.key !== "Enter") return;
+      const grace = ev.shiftKey ? COMPOSER_AFTER_ENTER_GRACE_MS : 300;
+      skipComposerFixUntil.set(el, Date.now() + grace);
+    },
+    { capture: true },
+  );
+  el.addEventListener(
+    "blur",
+    () => {
+      const prev = scheduledInputFix.get(el);
+      if (prev !== undefined) window.clearTimeout(prev);
+      scheduledInputFix.delete(el);
+      if (!enabled || programmaticEdit.has(el)) return;
+      const ed = resolveGeminiQuillEditor(el);
+      if (ed) maintainGeminiComposer(ed);
+    },
+    { passive: true },
+  );
+
+  if (editor) maintainGeminiComposer(editor);
+  else applyGeminiQuillBidiOverrides(el);
+}
+
 function ensureEditableWired(el: Element): void {
   if (!enabled) return;
   if (!isEditableElement(el)) return;
   if (wiredEditables.has(el)) return;
   wiredEditables.add(el);
 
+  if (isGeminiQuillComposer(currentHostname(), el)) {
+    wireGeminiComposerEditable(el);
+    return;
+  }
+
   if (el instanceof HTMLElement) applyComposerBidiHintsForSurface(el);
+
+  const runFix = (mode: "typing" | "full") => {
+    if (!enabled) return;
+    if (programmaticEdit.has(el)) return;
+    if (composing.get(el)) return;
+    if (Date.now() < (skipComposerFixUntil.get(el) ?? 0)) return;
+
+    const currentComparable = comparableLogicalText(el);
+    const last = lastAppliedComparableText.get(el);
+    if (mode === "typing" && last !== undefined && last === currentComparable) return;
+
+    programmaticEdit.add(el);
+    try {
+      fixInputElement(el, mode);
+    } finally {
+      programmaticEdit.delete(el);
+      lastAppliedComparableText.set(el, comparableLogicalText(el));
+    }
+  };
 
   const schedule = () => {
     if (!enabled) return;
     if (programmaticEdit.has(el)) return;
     if (composing.get(el)) return;
+    if (Date.now() < (skipComposerFixUntil.get(el) ?? 0)) return;
 
     const prev = scheduledInputFix.get(el);
     if (prev !== undefined) window.clearTimeout(prev);
     const id = window.setTimeout(() => {
       scheduledInputFix.delete(el);
-      if (!enabled) return;
-      if (programmaticEdit.has(el)) return;
-      if (composing.get(el)) return;
-
-      if (el instanceof HTMLElement) applyComposerBidiHintsForSurface(el);
-
-      const currentComparable = comparableLogicalText(el);
-      const last = lastAppliedComparableText.get(el);
-      if (last !== undefined && last === currentComparable) return;
-
-      // Prevent our own write-back from re-triggering.
-      programmaticEdit.add(el);
-      try {
-        fixInputElement(el);
-      } finally {
-        programmaticEdit.delete(el);
-        lastAppliedComparableText.set(el, comparableLogicalText(el));
-      }
-    }, 55);
+      runFix("typing");
+    }, COMPOSER_INPUT_DEBOUNCE_MS);
     scheduledInputFix.set(el, id);
   };
+
+  composerScheduleByEditable.set(el, schedule);
 
   el.addEventListener("compositionstart", () => composing.set(el, true), { passive: true });
   el.addEventListener("compositionend", () => {
@@ -685,9 +566,27 @@ function ensureEditableWired(el: Element): void {
     },
     { passive: true },
   );
+  el.addEventListener(
+    "keydown",
+    (ev) => {
+      if (ev.key !== "Enter") return;
+      const grace = ev.shiftKey ? COMPOSER_AFTER_ENTER_GRACE_MS : 300;
+      skipComposerFixUntil.set(el, Date.now() + grace);
+    },
+    { capture: true },
+  );
+  el.addEventListener(
+    "blur",
+    () => {
+      const prev = scheduledInputFix.get(el);
+      if (prev !== undefined) window.clearTimeout(prev);
+      scheduledInputFix.delete(el);
+      runFix("full");
+    },
+    { passive: true },
+  );
 
-  // Initial pass (if the user already has mixed content in the composer).
-  schedule();
+  window.setTimeout(() => runFix("typing"), 0);
 }
 
 function tryInitIframe(iframe: HTMLIFrameElement): void {
@@ -706,9 +605,26 @@ function tryInitIframe(iframe: HTMLIFrameElement): void {
   }
 }
 
+function wireComposerFromNode(node: Node): void {
+  const editable = firstEditableAncestor(node);
+  if (!editable || !isEditableElement(editable)) return;
+  ensureEditableWired(editable);
+  composerScheduleByEditable.get(editable)?.();
+}
+
+function ensureEditablesWiredInTree(root: Element): void {
+  for (const node of querySelectorAllDeepFrom(root, EDITABLE_SELECTOR)) {
+    ensureEditableWired(node);
+  }
+}
+
 function onDomMutation(mutations: MutationRecord[]): void {
   for (const m of mutations) {
     if (m.type === "characterData" && m.target.nodeType === Node.TEXT_NODE) {
+      if (isInsideEditable(m.target)) {
+        wireComposerFromNode(m.target);
+        continue;
+      }
       enqueueNode(m.target);
       continue;
     }
@@ -716,6 +632,13 @@ function onDomMutation(mutations: MutationRecord[]): void {
     if (m.type === "childList") {
       const addedNodes = Array.from(m.addedNodes as unknown as NodeListOf<Node>);
       for (const added of addedNodes) {
+        if (isInsideEditable(added)) {
+          wireComposerFromNode(added);
+          continue;
+        }
+        if (added.nodeType === Node.ELEMENT_NODE) {
+          ensureEditablesWiredInTree(added as Element);
+        }
         if (added.nodeType === Node.TEXT_NODE || added.nodeType === Node.ELEMENT_NODE) {
           enqueueNode(added);
         }
@@ -736,7 +659,10 @@ function ensureObserverForShadowRoot(sr: ShadowRoot): void {
   observers.set(sr, obs);
 
   for (const c of Array.from(sr.children)) {
-    if (c instanceof Element) scanSubtreeFromElement(c);
+    if (c instanceof Element) {
+      ensureEditablesWiredInTree(c);
+      scanSubtreeFromElement(c);
+    }
   }
 }
 

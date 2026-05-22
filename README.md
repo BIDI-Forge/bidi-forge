@@ -181,4 +181,4 @@ For open-source projects, the MIT License is a popular choice because it is simp
 ## Publishing
 
 - **VS Code / Cursor**: from `packages/vscode-extension` run `pnpm package` to build a `.vsix`.
-- **Chrome**: zip `packages/chrome-extension/dist` and upload to Chrome Web Store.
+- **Chrome**: run `pnpm -C packages/chrome-extension pack:store` then upload `store/release/rtl-text-fixer-chrome-*.zip` to the [Chrome Web Store Developer Console](https://chrome.google.com/webstore/devconsole). See `packages/chrome-extension/store/UPLOAD_GUIDE.md`.

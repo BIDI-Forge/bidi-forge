@@ -2,7 +2,7 @@
 
 Manifest V3 extension that improves mixed Persian/Arabic + English readability by inserting Unicode bidi marks (LRM/RLM) into DOM text and editable fields.
 
-**Current version:** `0.2.0` (see `src/manifest.json`).
+**Current version:** `0.3.3` (see `src/manifest.json`).
 
 ## Build
 
@@ -16,6 +16,25 @@ pnpm -C packages/chrome-extension build
 The extension bundle resolves `@rtl-text-fixer/core` from `packages/core/src` (esbuild `alias`), so you do **not** need to run `pnpm -C packages/core build` first for the Chrome `dist` output.
 
 Load unpacked from `packages/chrome-extension/dist` in `chrome://extensions` (Developer mode). After each rebuild, open `chrome://extensions` and click **Reload** on this extension.
+
+## Chrome Web Store upload
+
+Prepare the signed upload ZIP and listing assets:
+
+```bash
+pnpm -C packages/chrome-extension pack:store
+```
+
+| Output | Path |
+|--------|------|
+| Upload ZIP | `store/release/rtl-text-fixer-chrome-0.3.0.zip` |
+| Store icon 128×128 | `store/promo/icon-128.png` |
+| Screenshot 1280×800 | `store/screenshots/screenshot-1280x800.png` |
+| Listing copy (EN) | `store/LISTING.md` |
+| Privacy policy | `store/privacy-policy.md` |
+| Upload steps (FA) | `store/UPLOAD_GUIDE.md` |
+
+Dashboard: [Chrome Web Store Developer Console](https://chrome.google.com/webstore/devconsole)
 
 ## How to test (e.g. Claude, ChatGPT)
 
@@ -63,8 +82,8 @@ You can paste full URLs in host lists; hostnames are extracted automatically.
 ## Implementation notes
 
 - Content script entry: `src/content.ts`.
-- **ProseMirror-style editors** (Claude, ChatGPT, …): block-level fixes use per-`<p>` / block `<div>` (or flat composer) with **DOM `textContent` only** — never `innerText`, which follows *visual* order in mixed RTL/LTR and caused garbled markers. LRM/RLM are stripped before re-tokenizing so markers do not stack. Updates prefer `document.execCommand("insertText", …)` with `textContent` fallback; a per-node pass still runs for edge cases (core tokenization is idempotent on already-wrapped LTR runs). Wired editors get `dir="auto"` and inline `unicode-bidi: plaintext` so markers can affect layout when the app would otherwise keep the field strictly LTR.
-- **Gemini (Quill)**: the prompt uses `.ql-editor` inside `<rich-textarea dir="rtl">`. That outer `rtl` breaks mixed-script layout even with LRM; the content script sets `dir="auto"` and `unicode-bidi`/`direction` on `rich-textarea` and `.ql-container` with `!important`. Quill’s `.ql-clipboard` helper is excluded from wiring.
+- **ProseMirror-style editors** (Claude, ChatGPT, …): while typing, only the **caret paragraph** is fixed (coalesced text-node update, no `execCommand` / `normalize()`). **Shift+Enter** gets a grace period so new lines are not fighting the fixer. On **blur**, all paragraphs are fixed. Bidi CSS hints apply **once** per composer (reduces Gemini layout jumping). Wired editors get `dir="auto"` and `unicode-bidi: plaintext`.
+- **Gemini (Quill)**: `geminiQuill.ts` on `gemini.google.com` only — **CSS** (`dir=auto`, `unicode-bidi: plaintext`) on `rich-textarea` and each `<p>`; removes Quill `ql-direction-rtl`. **No LRM/RLM in the composer** (markers break Quill spans). Debounced **strip** of stray markers only. Assistant replies use Gemini-specific selectors, not `.ProseMirror`.
 - **Open shadow roots**: composer UI may live under shadow DOM; `src/domDeep.ts` + extra `MutationObserver`s on `ShadowRoot` cover those trees.
 - Scope logic: `src/siteScope.ts`, storage keys in `src/storage.ts`.
 - Built-in preset list lives in `BUILTIN_PRESET_HOSTS` in `siteScope.ts` (includes Google-related hosts used by Gemini embeds, e.g. `ogs.google.com`); update when major AI UIs change domains.
