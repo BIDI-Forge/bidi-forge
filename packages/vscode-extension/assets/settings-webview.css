@@ -1,0 +1,71 @@
+:root {
+  color-scheme: light dark;
+  font-family: var(--vscode-font-family, system-ui, sans-serif);
+  font-size: var(--vscode-font-size, 13px);
+  color: var(--vscode-foreground, #ccc);
+  background: var(--vscode-editor-background, #1e1e1e);
+}
+
+body {
+  margin: 0;
+  padding: 1.25rem 1.5rem 2rem;
+  line-height: 1.6;
+}
+
+.header h1 {
+  margin: 0 0 0.5rem;
+  font-size: 1.35rem;
+}
+
+.section {
+  margin-top: 1.5rem;
+}
+
+.section h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.05rem;
+  border-bottom: 1px solid var(--vscode-panel-border, #444);
+  padding-bottom: 0.35rem;
+}
+
+.bidi-isolate {
+  unicode-bidi: isolate;
+}
+
+.ltr-block {
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: left;
+  display: inline-block;
+}
+
+pre.sample {
+  margin: 0.35rem 0 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 4px;
+  background: var(--vscode-textCodeBlock-background, #2d2d2d);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.label {
+  margin: 0.5rem 0 0.25rem;
+  opacity: 0.85;
+  font-size: 0.9em;
+}
+
+ul {
+  padding-right: 1.25rem;
+  margin: 0;
+}
+
+.footer {
+  margin-top: 2rem;
+  font-size: 0.85em;
+  opacity: 0.8;
+}
+
+.footer a {
+  color: var(--vscode-textLink-foreground, #3794ff);
+}

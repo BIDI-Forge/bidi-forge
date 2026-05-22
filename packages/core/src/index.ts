@@ -1,12 +1,41 @@
 export { detectLanguage, getCharClass } from "./languageDetector.js";
-export { tokenizeText } from "./tokenizer.js";
-export { applyBidiMarkers, LRM, RLM } from "./bidiFixer.js";
+export { tokenizeText, tokenizeNormalized } from "./tokenizer.js";
+export {
+  applyBidiMarkers,
+  LRM,
+  RLM,
+  LRI,
+  RLI,
+  FSI,
+  PDI,
+} from "./bidiFixer.js";
+export { normalizeText } from "./normalize.js";
+export { stripBidiMarkers, wrapIsolate, wrapLrm, wrapRlm, hasBidiMarkers } from "./isolates.js";
+export { detectParagraphDirection } from "./detectDirection.js";
+export { formatUiText } from "./formatUiText.js";
+export { findAtomicLtrSpans } from "./runs.js";
+export { iterateGraphemes } from "./segments.js";
 
-import { tokenizeText } from "./tokenizer.js";
+import type { FixMixedTextOptions } from "@rtl-text-fixer/shared";
+import { normalizeText } from "./normalize.js";
+import { stripBidiMarkers } from "./isolates.js";
+import { tokenizeNormalized } from "./tokenizer.js";
 import { applyBidiMarkers } from "./bidiFixer.js";
+import { detectParagraphDirection } from "./detectDirection.js";
 
-export function fixMixedText(text: string): string {
-  const tokens = tokenizeText(text);
-  const fixed = applyBidiMarkers(tokens);
+export function fixMixedText(text: string, options?: FixMixedTextOptions): string {
+  const mode = options?.mode ?? "enhanced";
+  const stripMarkers =
+    options?.stripExistingMarkers ?? (mode === "enhanced");
+
+  const normalized = normalizeText(text);
+  const prepared = stripMarkers ? stripBidiMarkers(normalized) : normalized;
+  const tokens = tokenizeNormalized(prepared, false);
+  const paragraphDirection = detectParagraphDirection(prepared);
+  const fixed = applyBidiMarkers(tokens, {
+    mode,
+    stripExistingMarkers: stripMarkers,
+    paragraphDirection,
+  });
   return fixed.map((t) => t.value).join("");
 }

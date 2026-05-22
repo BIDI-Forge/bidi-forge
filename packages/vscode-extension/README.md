@@ -1,56 +1,77 @@
 # RTL Text Fixer (VS Code / Cursor)
 
-Fix mixed Persian (RTL) and English (LTR) text readability by inserting Unicode bidirectional markers (LRM/RLM).
+Fix mixed Persian (RTL) and English (LTR) text readability using Unicode bidirectional markers and BiDi-safe UI helpers.
 
 ## Commands
 
-- **RTL Fixer: اصلاح متن انتخاب‌شده** (`rtlFixer.fixSelectedText`)
-  - Fixes the currently selected text in the active editor.
-- **RTL Fixer: اصلاح متن کلیپ‌بورد** (`rtlFixer.fixClipboardText`)
-  - Reads text from clipboard, fixes it, writes it back to clipboard.
-  - Useful for Cursor Chat/Agent input: run the command, then paste into chat.
-- **RTL Fixer: فعال‌سازی RTL برای UI (با Custom CSS)** (`rtlFixer.enableRtlUi`)
-  - Enables an *opt-in* RTL workbench UI using the third-party **Custom CSS and JS Loader** extension.
-- **RTL Fixer: غیرفعال‌سازی RTL برای UI (با Custom CSS)** (`rtlFixer.disableRtlUi`)
-  - Disables the opt-in RTL workbench UI (requires reload).
+| Command | ID | Description |
+|---------|-----|-------------|
+| اصلاح متن انتخاب‌شده | `rtlFixer.fixSelectedText` | Fix selected editor text |
+| اصلاح متن کلیپ‌بورد | `rtlFixer.fixClipboardText` | Fix clipboard (paste into chat) |
+| تنظیمات و راهنما | `rtlFixer.openSettings` | BiDi-safe settings/help webview |
+| فعال‌سازی RTL UI | `rtlFixer.enableRtlUi` | Inject scoped `rtl-ui.css` via Custom CSS |
+| غیرفعال‌سازی RTL UI | `rtlFixer.disableRtlUi` | Remove CSS import |
 
 ## Keybindings (default)
 
 - **Fix selected text**: `Ctrl+Alt+R` (macOS: `Cmd+Alt+R`)
 - **Fix clipboard**: `Ctrl+Alt+Shift+R` (macOS: `Cmd+Alt+Shift+R`)
 
-## Development
+## Status bar
 
-From the repo root:
+A status bar item shows **RTL UI: فعال/غیرفعال** and opens the settings webview on click.
 
-```bash
-pnpm dev
-```
+## Settings
 
-Then press `F5` using the repo `.vscode/launch.json`.
+- `rtlFixer.uiMessageDirection` — `rtl` (default), `ltr`, or `auto` for notification BiDi formatting
+- `rtlFixer.fixOnPaste` — reserved (not implemented yet)
 
-## RTL UI (Workbench) setup (Cursor / VS Code)
+## RTL UI (Workbench) setup
 
-VS Code / Cursor extensions **cannot** officially flip the whole workbench UI to RTL. The practical approach is injecting CSS via the third-party extension:
+VS Code/Cursor **cannot** officially RTL the whole workbench. This extension ships **scoped** [`assets/rtl-ui.css`](assets/rtl-ui.css) (v2) injected through:
 
-- `be5invis.vscode-custom-css` (Custom CSS and JS Loader)
+- [`be5invis.vscode-custom-css`](https://marketplace.visualstudio.com/items?itemName=be5invis.vscode-custom-css) (install separately; not a hard dependency)
 
 ### Steps
 
-1. Install this extension (`rtl-text-fixer-*.vsix`).
-2. Install `be5invis.vscode-custom-css` (dependency).
-3. Run: `RTL Fixer: فعال‌سازی RTL برای UI (با Custom CSS)`.
-4. Run: `Enable Custom CSS and JS` (or `Reload Custom CSS and JS`).
-5. Reload window: `Developer: Reload Window`.
+1. Install this extension.
+2. Install **Custom CSS and JS Loader**.
+3. Run: **RTL Fixer: فعال‌سازی RTL برای UI (با Custom CSS)**.
+4. Run: **Enable Custom CSS and JS** (or Reload).
+5. **Developer: Reload Window**.
 
-### Notes
+### What v2 CSS does
 
-- **Windows**: you may need to run Cursor/VS Code as **Administrator** when enabling/disabling Custom CSS.
-- This is **opt-in** and may break after Cursor/VS Code updates (DOM/CSS selectors can change).
+- RTL on layout chrome (sidebar, panel, status bar) — not global `body` flip
+- `unicode-bidi: plaintext` + `direction: auto` on notifications, settings, quick input
+- Editor, terminal, hovers stay **LTR**
+- Best-effort Cursor chat/composer selectors
 
-### Recovery / reset
+### Platform limits
 
-1. Run: `RTL Fixer: غیرفعال‌سازی RTL برای UI (با Custom CSS)`.
-2. Run: `Disable Custom CSS and JS`.
-3. Reload window.
+- Notification DOM cannot be patched via extension API (CSS only).
+- Chat UI selectors may break between Cursor releases.
+- **Windows**: Custom CSS may require running the editor as Administrator.
 
+### Recovery
+
+1. **RTL Fixer: غیرفعال‌سازی RTL برای UI**
+2. **Disable Custom CSS and JS**
+3. Reload window
+
+## Development
+
+```bash
+pnpm dev          # from repo root
+pnpm -C packages/vscode-extension test
+```
+
+Press `F5` with the repo launch config.
+
+## Troubleshooting
+
+| Issue | Action |
+|-------|--------|
+| Notifications still wrong | Enable Custom CSS + reload; set `rtlFixer.uiMessageDirection` to `rtl` |
+| Chat input order wrong | Enable RTL UI v2 CSS; update Cursor may require selector tweaks in `rtl-ui.css` |
+| Paths inverted in Quick Open | v2 uses `direction: auto` on quick input — reload after CSS update |

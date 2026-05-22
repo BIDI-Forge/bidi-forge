@@ -1,6 +1,8 @@
 import type { Token, Direction } from "@rtl-text-fixer/shared";
 import { getCharClass } from "./languageDetector.js";
-import { LRM, RLM } from "./bidiFixer.js";
+import { LRM, RLM, stripBidiMarkers } from "./isolates.js";
+import { findAtomicLtrSpans, spanAt } from "./runs.js";
+import { iterateGraphemes } from "./segments.js";
 
 function dirFromCharClass(cc: ReturnType<typeof getCharClass>): Direction {
   switch (cc) {
@@ -19,72 +21,103 @@ function dirFromCharClass(cc: ReturnType<typeof getCharClass>): Direction {
   }
 }
 
+function isMarkerGrapheme(g: string): boolean {
+  return g === LRM || g === RLM || /^[\u2066-\u2069]$/.test(g);
+}
+
 export function tokenizeText(text: string): Token[] {
+  const atomicSpans = findAtomicLtrSpans(text);
   const tokens: Token[] = [];
   let current: Token | undefined;
   let pendingMarkers = "";
+  let i = 0;
 
-  for (const ch of text) {
-    // Keep bidi markers attached to adjacent strong tokens for idempotence.
-    if (ch === LRM || ch === RLM) {
-      if (current) current.value += ch;
-      else pendingMarkers += ch;
+  while (i < text.length) {
+    const atomic = spanAt(atomicSpans, i);
+    if (atomic) {
+      if (current) {
+        tokens.push(current);
+        current = undefined;
+      }
+      if (pendingMarkers) {
+        tokens.push({ value: pendingMarkers, dir: "OTHER" });
+        pendingMarkers = "";
+      }
+      tokens.push({
+        value: atomic.value,
+        dir: "LTR",
+        kind: atomic.kind,
+      });
+      i = atomic.end;
       continue;
     }
 
-    const dir = dirFromCharClass(getCharClass(ch));
+    const graphemes = iterateGraphemes(text.slice(i));
+    const g = graphemes[0] ?? "";
+    const chLen = g.length;
+    i += chLen;
+
+    if (isMarkerGrapheme(g)) {
+      if (current) current.value += g;
+      else pendingMarkers += g;
+      continue;
+    }
+
+    const dir = dirFromCharClass(getCharClass(g));
 
     if (!current) {
-      current = { value: pendingMarkers + ch, dir };
+      current = { value: pendingMarkers + g, dir, kind: "normal" };
       pendingMarkers = "";
       continue;
     }
 
-    // Keep whitespace separate (preserve exact spacing/newlines).
     if (current.dir === "WHITESPACE" || dir === "WHITESPACE") {
       tokens.push(current);
-      current = { value: pendingMarkers + ch, dir };
+      current = { value: pendingMarkers + g, dir, kind: "normal" };
       pendingMarkers = "";
       continue;
     }
 
-    // Group consecutive chars of same direction.
     if (current.dir === dir) {
-      current.value += ch;
+      current.value += g;
       continue;
     }
 
-    // Heuristic: attach common currency/percent punctuation to adjacent numbers
-    // so `100$` or `$100` remain a single token.
-    const isCurrencyOrPercent = ch === "$" || ch === "%" || ch === "€" || ch === "£";
+    const isCurrencyOrPercent = g === "$" || g === "%" || g === "€" || g === "£";
     if (
       current.dir === "NUMBER" &&
       (dir === "PUNCTUATION" || dir === "OTHER") &&
       isCurrencyOrPercent
     ) {
-      current.value += ch;
+      current.value += g;
       continue;
     }
     if (
       (current.dir === "PUNCTUATION" || current.dir === "OTHER") &&
-      current.value.length === 1 &&
+      current.value.length === g.length &&
       isCurrencyOrPercent &&
       dir === "NUMBER"
     ) {
-      current.value += ch;
+      current.value += g;
       current.dir = "NUMBER";
       continue;
     }
 
     tokens.push(current);
-    current = { value: pendingMarkers + ch, dir };
+    current = { value: pendingMarkers + g, dir, kind: "normal" };
     pendingMarkers = "";
   }
 
   if (pendingMarkers) {
     if (current) current.value += pendingMarkers;
-    else tokens.push({ value: pendingMarkers, dir: "OTHER" });
+    else tokens.push({ value: pendingMarkers, dir: "OTHER", kind: "normal" });
   }
   if (current) tokens.push(current);
   return tokens;
+}
+
+/** Tokenize after stripping markers (for idempotent enhanced passes). */
+export function tokenizeNormalized(text: string, stripMarkers = true): Token[] {
+  const base = stripMarkers ? stripBidiMarkers(text) : text;
+  return tokenizeText(base);
 }

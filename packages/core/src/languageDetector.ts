@@ -1,6 +1,7 @@
 export type DetectedLanguage = "FA" | "EN" | "MIXED" | "UNKNOWN";
 
 const PERSIAN_RE = /[\u0600-\u06FF]/;
+const HEBREW_RE = /[\u0590-\u05FF]/;
 const ENGLISH_RE = /[a-zA-Z]/;
 const NUMBER_RE = /[0-9]/;
 
@@ -29,7 +30,7 @@ function isAsciiPunctuation(ch: string): boolean {
 
 export function getCharClass(ch: string): CharClass {
   if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") return "SPACE";
-  if (PERSIAN_RE.test(ch)) return "RTL";
+  if (PERSIAN_RE.test(ch) || HEBREW_RE.test(ch)) return "RTL";
   if (ENGLISH_RE.test(ch)) return "LTR";
   if (NUMBER_RE.test(ch)) return "NUMBER";
   if (isAsciiPunctuation(ch)) return "PUNCT";

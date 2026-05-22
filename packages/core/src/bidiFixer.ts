@@ -1,7 +1,7 @@
-import type { Token, Direction } from "@rtl-text-fixer/shared";
+import type { Token, Direction, FixMixedTextOptions, ParagraphDirection } from "@rtl-text-fixer/shared";
+import { hasBidiMarkers, wrapIsolate, wrapLrm, wrapRlm } from "./isolates.js";
 
-export const LRM = "\u200E";
-export const RLM = "\u200F";
+export { LRM, RLM, LRI, RLI, FSI, PDI } from "./isolates.js";
 
 function isStrongDir(dir: Direction): dir is "RTL" | "LTR" {
   return dir === "RTL" || dir === "LTR";
@@ -23,34 +23,84 @@ function findNextStrong(tokens: Token[], idx: number): "RTL" | "LTR" | undefined
   return undefined;
 }
 
-function hasBidiMarkers(value: string): boolean {
-  return value.includes(LRM) || value.includes(RLM);
+function isAtomicLtrToken(t: Token): boolean {
+  return t.kind === "url" || t.kind === "email" || t.kind === "path" || t.kind === "code";
 }
 
-function wrapIfNeeded(value: string, marker: string): string {
-  if (value.length === 0) return value;
-  // Avoid double-wrapping already-marked strings; keep idempotent.
-  if (value.startsWith(marker) && value.endsWith(marker)) return value;
-  return `${marker}${value}${marker}`;
-}
-
-/**
- * Inserts Unicode bidi markers around strong-direction tokens when surrounded by opposite-direction context.
- * Returns tokens with updated `value` fields (directions unchanged).
- */
-export function applyBidiMarkers(tokens: Token[]): Token[] {
+function applyLegacyMarkers(tokens: Token[]): Token[] {
   return tokens.map((t, idx) => {
-    // v0.1 behavior: wrap only LTR runs when they appear in RTL context,
-    // matching the expected example outputs.
     if (t.dir !== "LTR") return t;
     if (hasBidiMarkers(t.value)) return t;
 
     const prev = findPrevStrong(tokens, idx);
     const next = findNextStrong(tokens, idx);
-
     const inRtlContext = prev === "RTL" || next === "RTL";
     if (!inRtlContext) return t;
 
-    return { ...t, value: wrapIfNeeded(t.value, LRM) };
+    return { ...t, value: wrapLrm(t.value) };
   });
+}
+
+function applyEnhancedMarkers(
+  tokens: Token[],
+  paragraphDirection: ParagraphDirection,
+): Token[] {
+  const wrapRtlInLtrParagraph = paragraphDirection === "ltr";
+
+  return tokens.map((t, idx) => {
+    if (hasBidiMarkers(t.value) && !isAtomicLtrToken(t)) return t;
+
+    const prev = findPrevStrong(tokens, idx);
+    const next = findNextStrong(tokens, idx);
+    const inRtlContext = prev === "RTL" || next === "RTL";
+    const inLtrContext = prev === "LTR" || next === "LTR";
+
+    if (isAtomicLtrToken(t)) {
+      if (inRtlContext || paragraphDirection === "rtl") {
+        return { ...t, value: wrapIsolate(t.value, "ltr") };
+      }
+      return t;
+    }
+
+    if (t.dir === "LTR") {
+      if (!inRtlContext) return t;
+      return { ...t, value: wrapLrm(t.value) };
+    }
+
+    if (t.dir === "RTL") {
+      if (!wrapRtlInLtrParagraph || !inLtrContext) return t;
+      if (hasBidiMarkers(t.value)) return t;
+      return { ...t, value: wrapRlm(t.value) };
+    }
+
+    if (t.dir === "NUMBER") {
+      const hasRtlNeighbor = inRtlContext && !inLtrContext;
+      const hasLtrNeighbor = inLtrContext && !inRtlContext;
+      if (hasRtlNeighbor && /[0-9]/.test(t.value)) {
+        return { ...t, value: wrapLrm(t.value) };
+      }
+      if (hasLtrNeighbor && /[\u06F0-\u06F9\u0660-\u0669]/.test(t.value)) {
+        return { ...t, value: wrapRlm(t.value) };
+      }
+    }
+
+    return t;
+  });
+}
+
+/**
+ * Inserts Unicode bidi markers around strong-direction tokens when surrounded by opposite-direction context.
+ */
+export interface ApplyBidiMarkersOptions extends FixMixedTextOptions {
+  paragraphDirection?: ParagraphDirection;
+}
+
+export function applyBidiMarkers(
+  tokens: Token[],
+  options?: ApplyBidiMarkersOptions,
+): Token[] {
+  const mode = options?.mode ?? "enhanced";
+  if (mode === "legacy") return applyLegacyMarkers(tokens);
+  const paragraphDirection = options?.paragraphDirection ?? "neutral";
+  return applyEnhancedMarkers(tokens, paragraphDirection);
 }
