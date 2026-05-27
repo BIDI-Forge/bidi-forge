@@ -3,93 +3,204 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>RTL Text Fixer</title>
+    <title>BIDI - Forge</title>
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
-    <main class="app" aria-label="RTL Text Fixer settings">
-      <header class="header">
-        <div class="titleRow">
-          <div class="mark" aria-hidden="true"></div>
-          <div>
-            <h1 class="title">RTL Text Fixer</h1>
-            <p class="subtitle">Fix mixed Persian/English readability on modern chat sites.</p>
+    <div class="ambient" aria-hidden="true">
+      <div class="ambient__orb ambient__orb--1"></div>
+      <div class="ambient__orb ambient__orb--2"></div>
+      <div class="ambient__grid"></div>
+      <div class="ambient__noise"></div>
+    </div>
+
+    <main class="shell" aria-label="BIDI - Forge settings">
+      <header class="hero">
+        <div class="hero__visual">
+          <div class="hero__ring" aria-hidden="true"></div>
+          <img class="hero__logo" src="icons/icon128.png" width="64" height="64" alt="" />
+        </div>
+        <div class="hero__copy">
+          <div class="hero__titleRow">
+            <h1 class="hero__title">BIDI - Forge</h1>
+            <span class="hero__version" id="version">v0.3.4</span>
           </div>
+          <p class="hero__lead">
+            Mixed Persian, Arabic &amp; English — optimized for <strong>Claude.ai</strong> composer and
+            assistant replies.
+          </p>
+          <ul class="hero__pills" aria-label="Highlights">
+            <li class="pill pill--claude">Claude-first</li>
+            <li class="pill pill--accent">AI presets</li>
+            <li class="pill">Local only</li>
+          </ul>
         </div>
       </header>
 
-      <section class="card" aria-label="Main setting">
-        <div class="cardRow">
-          <div class="cardText">
-            <div class="cardTitle">Enable</div>
-            <div class="cardHint">Applies to this browser profile.</div>
+      <section class="card card--power" aria-label="Extension power">
+        <div class="card__row">
+          <div>
+            <h2 class="card__label">Power</h2>
+            <p class="card__sublabel">This Chrome profile</p>
           </div>
-
-          <label class="switch" aria-label="Enable RTL Text Fixer">
+          <label class="toggle" aria-label="Enable BIDI - Forge">
             <input id="enabled" type="checkbox" />
-            <span class="track" aria-hidden="true"></span>
-            <span class="thumb" aria-hidden="true"></span>
+            <span class="toggle__track"></span>
+            <span class="toggle__thumb"></span>
           </label>
         </div>
-
-        <div class="statusRow" role="status" aria-live="polite">
-          <span id="status" class="status">Loading…</span>
+        <div class="status" id="statusBar" role="status" aria-live="polite">
+          <span class="status__pulse" aria-hidden="true"></span>
+          <div class="status__text">
+            <span id="status" class="status__primary">Loading…</span>
+            <span id="statusDetail" class="status__secondary"></span>
+          </div>
         </div>
       </section>
 
-      <section class="card scopeCard" aria-label="Site scope">
-        <div class="scopeHeader">
-          <div class="cardTitle">Where it runs</div>
-          <p class="scopeHint">
-            Use <strong>AI chat sites only</strong> to avoid touching unrelated pages. Exclusions always apply.
+      <section class="bento" aria-label="Supported AI chats">
+        <article class="tile tile--brand tile--claude tile--wide">
+          <span class="tile__badge">Primary focus</span>
+          <h2 class="tile__title">Claude.ai</h2>
+          <p class="tile__body">
+            ProseMirror composer: caret-paragraph BiDi while typing, full fix on blur.
+            Assistant bubbles: <code>standard-markdown</code> + streaming-safe markers.
           </p>
+        </article>
+        <article class="tile tile--brand tile--chatgpt">
+          <span class="tile__icon" aria-hidden="true">◈</span>
+          <h2 class="tile__title">ChatGPT</h2>
+          <p class="tile__body">CSS-only ProseMirror composer — no marker spam while typing.</p>
+        </article>
+        <article class="tile tile--brand tile--gemini">
+          <span class="tile__icon" aria-hidden="true">◇</span>
+          <h2 class="tile__title">Gemini</h2>
+          <p class="tile__body">CSS-only Quill composer — no marker spam while typing.</p>
+        </article>
+        <article class="tile tile--brand tile--grok">
+          <span class="tile__icon" aria-hidden="true">✦</span>
+          <h2 class="tile__title">Grok</h2>
+          <p class="tile__body">CSS-only ProseMirror path on grok.com &amp; X.</p>
+        </article>
+        <article class="tile tile--brand tile--qwen">
+          <span class="tile__icon" aria-hidden="true">◐</span>
+          <h2 class="tile__title">Qwen</h2>
+          <p class="tile__body">chat.qwen.ai composer and assistant replies.</p>
+        </article>
+        <article class="tile tile--brand tile--copilot tile--soon">
+          <span class="tile__badge tile__badge--soon">Coming soon</span>
+          <h2 class="tile__title">Copilot</h2>
+          <p class="tile__body">Microsoft Copilot — planned support.</p>
+        </article>
+        <article class="tile tile--brand tile--perplexity tile--soon">
+          <span class="tile__badge tile__badge--soon">Coming soon</span>
+          <h2 class="tile__title">Perplexity</h2>
+          <p class="tile__body">Search-style answers — planned support.</p>
+        </article>
+        <article class="tile tile--brand tile--deepseek tile--soon">
+          <span class="tile__badge tile__badge--soon">Coming soon</span>
+          <h2 class="tile__title">DeepSeek</h2>
+          <p class="tile__body">Chat composer — planned support.</p>
+        </article>
+      </section>
+
+      <section class="card" aria-label="Coverage">
+        <div class="card__head">
+          <h2 class="card__label">Coverage</h2>
+          <p class="card__sublabel" id="scopeHint">AI chat hosts — recommended</p>
         </div>
 
-        <div class="scopeOptions" role="radiogroup" aria-label="Site scope mode">
-          <label class="scopeOption">
+        <div class="scope" role="radiogroup" aria-label="Site scope mode">
+          <label class="scope__opt">
             <input type="radio" name="siteScope" value="all" />
-            <span class="scopeOptionText">
-              <span class="scopeOptionTitle">All websites</span>
-              <span class="scopeOptionSub">Same as before: every tab when enabled.</span>
+            <span class="scope__card">
+              <span class="scope__name">All websites</span>
+              <span class="scope__desc">Every tab — more CPU use</span>
             </span>
           </label>
-          <label class="scopeOption">
+          <label class="scope__opt">
             <input type="radio" name="siteScope" value="presets" />
-            <span class="scopeOptionText">
-              <span class="scopeOptionTitle">AI chat sites only</span>
-              <span class="scopeOptionSub">Built-in presets plus optional extra hosts below.</span>
+            <span class="scope__card">
+              <span class="scope__badge">Recommended</span>
+              <span class="scope__name">AI chat sites</span>
+              <span class="scope__desc">Includes claude.ai · anthropic.com by default</span>
             </span>
           </label>
         </div>
 
-        <div class="hostFields">
-          <label class="hostLabel" for="includeHosts">Extra hosts (optional)</label>
-          <textarea
-            id="includeHosts"
-            class="hostTextarea"
-            rows="3"
-            spellcheck="false"
-            autocomplete="off"
-            placeholder="e.g. my-chat.example.com&#10;Or paste full URLs, one per line"
-          ></textarea>
-
-          <label class="hostLabel hostLabelSpaced" for="excludeHosts">Never run on these hosts</label>
-          <textarea
-            id="excludeHosts"
-            class="hostTextarea"
-            rows="2"
-            spellcheck="false"
-            autocomplete="off"
-            placeholder="One hostname per line (applies in both modes)"
-          ></textarea>
+        <div class="hosts" id="hostBlock">
+          <div class="hosts__field">
+            <label class="hosts__label" for="includeHosts">
+              Extra hosts
+              <span class="hosts__tag">presets mode</span>
+            </label>
+            <textarea
+              id="includeHosts"
+              class="hosts__input"
+              rows="2"
+              spellcheck="false"
+              autocomplete="off"
+              placeholder="claude.enterprise.com"
+            ></textarea>
+          </div>
+          <div class="hosts__field">
+            <label class="hosts__label" for="excludeHosts">
+              Blocklist
+              <span class="hosts__tag">always</span>
+            </label>
+            <textarea
+              id="excludeHosts"
+              class="hosts__input"
+              rows="2"
+              spellcheck="false"
+              autocomplete="off"
+              placeholder="bank.example.com"
+            ></textarea>
+          </div>
         </div>
       </section>
 
       <footer class="footer">
-        <div class="sites">
-          Presets include ChatGPT, Gemini, Claude, Copilot, Perplexity, DeepSeek, X/Grok, Qwen, Meta AI, and more.
+        <p class="footer__title">Also supports</p>
+        <div class="footer__chips">
+          <span class="chip chip--brand chip--claude">Claude</span>
+          <span class="chip chip--brand chip--chatgpt">ChatGPT</span>
+          <span class="chip chip--brand chip--gemini">Gemini</span>
+          <span class="chip chip--brand chip--grok">Grok</span>
+          <span class="chip chip--brand chip--qwen">Qwen</span>
+          <span class="chip chip--brand chip--copilot chip--soon">Copilot</span>
+          <span class="chip chip--brand chip--perplexity chip--soon">Perplexity</span>
+          <span class="chip chip--brand chip--deepseek chip--soon">DeepSeek</span>
         </div>
       </footer>
+
+      <section class="powered" aria-label="Powered by">
+        <p class="powered__title">Powered by</p>
+        <div class="powered__people">
+          <a
+            class="powered__link"
+            href="https://github.com/amirmkazemi"
+            target="_blank"
+            rel="noopener noreferrer"
+          >Amir Mohamad Kazemi</a>
+          <span class="powered__sep" aria-hidden="true">·</span>
+          <a
+            class="powered__link"
+            href="https://github.com/azimhatami"
+            target="_blank"
+            rel="noopener noreferrer"
+          >Azim Hatami</a>
+        </div>
+        <a
+          class="powered__org"
+          href="https://github.com/BIDI-Forge"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <span class="powered__orgIcon" aria-hidden="true">◈</span>
+          BIDI-Forge
+        </a>
+      </section>
     </main>
     <script type="module" src="popup.js"></script>
   </body>

@@ -1,12 +1,12 @@
-# Privacy Policy — RTL Text Fixer (Chrome Extension)
+# Privacy Policy — BIDI - Forge (Chrome Extension)
 
 **Last updated:** May 2026  
-**Extension:** RTL Text Fixer  
-**Publisher:** Tocka69
+**Extension:** BIDI - Forge  
+**Publisher:** amirmkazemi
 
 ## Summary
 
-RTL Text Fixer runs entirely in your browser. It does **not** collect, sell, or transmit your personal data to our servers. We do not operate a backend service for this extension.
+BIDI - Forge runs entirely in your browser. It does **not** collect, sell, or transmit your personal data to our servers. We do not operate a backend service for this extension.
 
 ## What the extension does
 

@@ -1,0 +1,389 @@
+================================================================================
+  RTL Text Fixer — توضیح کامل پروژه (فارسی)
+  تاریخ سند: 2026
+  مخزن: monorepo با pnpm workspace
+================================================================================
+
+
+────────────────────────────────────────────────────────────────────────────────
+۱. این پروژه چیست و چه مشکلی حل می‌کند؟
+────────────────────────────────────────────────────────────────────────────────
+
+وقتی فارسی/عربی (راست‌به‌چپ) و انگلیسی (چپ‌به‌راست) در یک خط یا پاراگراف
+ترکیب می‌شوند، موتور BiDi مرورگر یا ویرایشگر گاهی ترتیب کلمات، پرانتزها،
+URLها و مسیرها را اشتباه نشان می‌دهد.
+
+مثال رایج:
+  ورودی:  سلام hello دنیا
+  خروجی: سلام ‎hello‎ دنیا   (با کاراکترهای نامرئی LRM دور «hello»)
+
+این پروژه یک «موتور متن» مشترک دارد و آن را در دو محصول استفاده می‌کند:
+  • افزونه VS Code / Cursor  — اصلاح دستی یا نیمه‌خودکار متن در ادیتور
+  • افزونه Chrome (MV3)     — اصلاح خودکار در صفحات وب (به‌ویژه چت‌های AI)
+
+لایسنس: MIT
+زبان پیاده‌سازی: TypeScript
+بیلد: pnpm workspace، esbuild (افزونه‌ها)، tsc (core)
+
+
+────────────────────────────────────────────────────────────────────────────────
+۲. ساختار Monorepo (ریز به ریز)
+────────────────────────────────────────────────────────────────────────────────
+
+ریشه مخزن (rtl-text-fixer/)
+├── package.json          اسکریپت‌های مشترک: build, test, lint, format
+├── pnpm-workspace.yaml   تعریف packages/*
+├── README.md             مستندات انگلیسی سطح بالا
+├── docs/                 مستندات اضافی (این فایل)
+├── LICENSE               MIT
+└── packages/
+    ├── shared/           تایپ‌های TypeScript مشترک
+    ├── core/             موتور BiDi (قلب پروژه)
+    ├── vscode-extension/ افزونه VS Code / Cursor
+    └── chrome-extension/ افزونه Chrome Manifest V3
+
+
+─── packages/shared ───
+نقش: قرارداد داده بین core و مصرف‌کننده‌ها.
+فایل اصلی: src/types.ts
+
+تعریف می‌کند:
+  • Direction — RTL, LTR, NUMBER, PUNCTUATION, WHITESPACE, OTHER
+  • Token — { value, dir, kind? }  kind می‌تواند url | email | path | code باشد
+  • ParagraphDirection — rtl | ltr | neutral
+  • FixMixedTextOptions — mode: legacy | enhanced
+  • FormatUiTextOptions — برای پیام‌های UI
+
+چرا جداست؟ تا core و افزونه‌ها بدون وابستگی چرخه‌ای از یک API تایپ‌شده
+استفاده کنند. scale: کم‌حجم، تغییرات API اینجا نسخه‌گذاری می‌شود.
+
+
+─── packages/core ───
+نقش: کتابخانه pure TypeScript — بدون DOM، بدون VS Code، بدون Chrome.
+ورودی/خروجی: رشته متن → رشته اصلاح‌شده.
+
+جریان fixMixedText() (فایل index.ts + bidiFixer.ts):
+
+  1) normalizeText()      — یکسان‌سازی فاصله و خط جدید
+  2) stripBidiMarkers()   — در حالت enhanced، مارکرهای قبلی حذف می‌شوند
+                            (جلوگیری از انباشت LRM/RLM)
+  3) tokenizeNormalized() — شکستن متن به توکن‌ها با جهت هر بخش
+  4) detectParagraphDirection() — تشخیص جهت غالب پاراگراف
+  5) applyBidiMarkers()   — درج مارکر Unicode مناسب
+  6) join توکن‌ها → خروجی نهایی
+
+ماژول‌های core:
+
+  languageDetector.ts
+    • تشخیص کلاس هر کاراکتر (فارسی، عربی، لاتین، عدد، علامت)
+    • پایهٔ tokenize
+
+  segments.ts
+    • iterateGraphemes — کار با grapheme cluster (ایموجی و حروف ترکیبی)
+
+  tokenizer.ts
+    • tokenizeText / tokenizeNormalized
+    • ادغام کاراکترهای هم‌جهت در یک توکن
+    • شناسایی spanهای اتمی LTR (URL، ایمیل، مسیر، کد backtick)
+
+  runs.ts
+    • findAtomicLtrSpans — regex برای https://، email، path ویندوز/یونیکس، `code`
+    • این بخش‌ها در enhanced با isolate (LRI/RLI/PDI) wrap می‌شوند
+
+  bidiFixer.ts
+    • legacy: فقط LRM دور توکن‌های LTR در زمینه RTL
+    • enhanced: LRM/RLM + isolate برای URL/path + RLM برای RTL در پاراگراف LTR
+
+  isolates.ts
+    • ثابت‌ها: LRM \u200E, RLM \u200F, LRI/RLI/FSI/PDI \u2066-\u2069
+    • stripBidiMarkers, wrapLrm, wrapRlm, wrapIsolate, hasBidiMarkers
+
+  detectDirection.ts
+    • detectParagraphDirection — rtl / ltr / neutral از روی اکثریت حروف قوی
+
+  formatUiText.ts
+    • formatUiText — برای نوتیفیکیشن و UI افزونه VS Code (متن مخلوط readable)
+
+  normalize.ts
+    • نرمال‌سازی Unicode و فاصله‌ها
+
+تست: packages/core/src/__tests__/fixMixedText.test.ts (vitest)
+
+محدودیت فعلی core:
+  • تمرکز روی فارسی/عربی + لاتین؛ زبان‌های RTL دیگر تا حدی با همان range کار می‌کنند
+  • یک پاراگراف در هر فراخوانی؛ متن چندخطی هر خط جدا پردازش نمی‌شود مگر consumer این کار را بکند
+  • بدون آگاهی از HTML — consumer مسئول DOM است
+
+
+─── packages/vscode-extension ───
+نسخه package.json: 0.3.0
+Publisher: amirmkazemi
+خروجی: rtl-text-fixer-0.3.0.vsix
+
+نقش: تجربه توسعه‌دهنده / نویسنده در VS Code و Cursor.
+
+فایل‌ها و وظایف:
+
+  extension.ts
+    • نقطه ورود activate/deactivate
+    • ثبت commandها، status bar، settings webview
+
+  commands/fixText.ts
+    • rtlFixer.fixSelectedText — fixMixedText روی selection
+    • rtlFixer.fixClipboardText — اصلاح کلیپ‌بورد (مفید برای paste در چت Cursor)
+
+  commands/rtlUi.ts
+    • rtlFixer.enableRtlUi / disableRtlUi
+    • همکاری با افزونه be5invis.vscode-custom-css برای تزریق CSS راست‌چین
+      در workbench (نه ادیتور کد — ادیتور LTR می‌ماند)
+
+  rtl/customCss.ts
+    • کپی rtl-ui.css به globalStorage
+    • به‌روزرسانی vscode_custom_css.imports
+
+  ui/messages.ts + formatUiText از core
+    • پیام‌های اطلاع‌رسانی با جهت درست (BiDi-safe notifications)
+
+  ui/statusBar.ts
+    • آیتم نوار وضعیت — نمایش حالت RTL UI
+
+  ui/settingsWebview.ts + webviewHtml.ts + assets/settings-webview.css
+    • پنل تنظیمات و راهنما داخل VS Code
+
+  assets/rtl-ui.css
+    • استایل scoped برای notification، settings، chat sidebar در صورت فعال‌سازی RTL UI
+
+بیلد: esbuild → dist/extension.cjs
+بسته‌بندی: vsce package --no-dependencies
+
+محدودیت VS Code API:
+  • flip رسمی کل workbench به RTL وجود ندارد — راه‌حل opt-in با Custom CSS
+  • اصلاح خودکار هنگام تایپ در ادیتور کد فعلاً نیست (فقط command)
+
+
+─── packages/chrome-extension ───
+نسخه manifest: 0.3.4
+Manifest V3 — content script + service worker + popup
+
+فایل‌های کلیدی:
+
+  manifest.json
+    • matches: <all_urls>  — اسکریپت روی همه URL inject می‌شود
+    • all_frames: false    — فقط فریم اصلی تب (برای جلوگیری از hang در iframeها)
+    • permissions: storage
+
+  background.ts
+    • service worker سبک — پیش‌فرض enabled در sync storage
+    • پیام GET_ENABLED / SET_ENABLED
+
+  storage.ts
+    • rtlTextFixerEnabled
+    • rtlTextFixerSiteScope: all | presets
+    • includeHosts / excludeHosts (لیست host اضافی یا مستثنی)
+
+  siteScope.ts
+    • BUILTIN_PRESET_HOSTS — chatgpt, claude, gemini, grok, perplexity, ...
+    • computeEffectiveEnabled — آیا روی این tab کار کند؟
+
+  popup.html / popup.ts / popup.css
+    • UI: روشن/خاموش، محدوده سایت، hostهای اضافی/مستثنی
+
+  content.ts  (بزرگ‌ترین فایل — منطق اصلی صفحه)
+    جریان کلی وقتی enabled است:
+
+    1) init() — خواندن storage، wire listener
+    2) فقط در فریم اصلی (isMainContentFrame): startObservers()
+    3) MutationObserver روی document.body + shadow rootهای باز
+    4) scanDocument — اسکن پیام‌های chat + wire کردن composerها (با debounce)
+    5) onDomMutation — batch شده (~32ms) تا CPU overload نشود
+
+    دو مسیر اصلاح:
+
+    A) Composer (قابل ویرایش)
+       • textarea یا contenteditable
+       • ensureEditableWired — listenerهای input/blur/paste
+       • ProseMirror (ChatGPT, Claude): فقط پاراگراف caret هنگام تایپ؛ blur = همه p
+       • tryFixMixedBlockCoalesced — بدون execCommand روی کل بلاک
+
+    B) پیام‌های read-only (پاسخ assistant)
+       • messageSurfaces.ts
+       • سلکتور بر اساس host: Claude data-testid، ChatGPT data-message-author-role،
+         Gemini .message-content، عمومی .ProseMirror غیر contenteditable
+       • applyReaderBidiStack — dir=auto, unicode-bidi: plaintext روی p و لیست‌ها
+       • fixReadOnlyBlock — fixMixedText روی متن coalesced
+       • isStillStreaming — تا پایان stream دست نمی‌زند
+
+  geminiQuill.ts — مسیر جدا برای gemini.google.com
+    • Quill editor: فقط CSS + strip مارکرهای اضافی
+    • عمداً بدون LRM/RLM در composer (Quill span می‌شکند)
+    • maintainGeminiComposer — debounced
+
+  blockFix.ts
+    • shouldFixMixedText — فقط وقتی هم فارسی هم انگلیسی باشد
+    • fixBlockCoalescedTextNodes — یک text node اصلی + خالی کردن بقیه
+    • getCaretOffsetInBlock / setCaretOffsetInBlock — حفظ مکان‌نما
+
+  domDeep.ts
+    • querySelectorAllDeepFrom — عبور از shadow DOM باز
+    • hookShadowRootsInTree — observer روی ShadowRoot
+
+  esbuild.config.ts
+    • content.js به صورت IIFE (Chrome ESM نیست)
+    • alias به core/src برای بیلد بدون pre-build core
+
+store/ — آماده Chrome Web Store
+  • LISTING.md, privacy-policy.md, UPLOAD_GUIDE.md
+  • scripts/pack-store-zip.mjs → store/release/*.zip
+  • scripts/generate-icons.mjs — آیکون و اسکرین‌شات
+
+
+────────────────────────────────────────────────────────────────────────────────
+۳. جریان داده (از دید کاربر)
+────────────────────────────────────────────────────────────────────────────────
+
+کاربر Chrome:
+  Popup ON → storage.sync → content script همان tab را applyEnabled(true)
+  → observer + scan → تایپ در ChatGPT → debounce → fixMixedText روی پاراگراف
+  → متن با مارکر در DOM (یا فقط CSS در Gemini)
+
+کاربر VS Code:
+  انتخاب متن → Ctrl+Alt+R → fixMixedText → replace selection
+  یا clipboard fix → paste در چت
+
+هیچ سرور backend، analytics اجباری، یا ارسال متن به cloud در کد پایه نیست —
+فقط chrome.storage.sync و تنظیمات محلی.
+
+
+────────────────────────────────────────────────────────────────────────────────
+۴. وابستگی‌ها و بیلد
+────────────────────────────────────────────────────────────────────────────────
+
+pnpm install
+pnpm build          — همه packages
+pnpm test           — core + vscode tests
+pnpm -C packages/chrome-extension pack:store   — ZIP فروشگاه
+pnpm -C packages/vscode-extension package      — VSIX
+
+Node 18+, pnpm 9+
+
+
+────────────────────────────────────────────────────────────────────────────────
+۵. پتانسیل Scale (فنی و محصول)
+────────────────────────────────────────────────────────────────────────────────
+
+─── Scale فنی (تا کجا می‌تواند بزرگ شود بدون بازنویسی کامل) ───
+
+الان (سطح کوچک–متوسط):
+  • ~۷۸ فایل سورس، monorepo تمیز
+  • core بدون side effect — قابل embed در Node، CLI، WASM، موبایل
+  • Chrome: یک content script سنگین روی all_urls — گلوگاه CPU و نگهداری
+
+محدودیت‌های scale فعلی:
+  1) content.ts متمرکز — هر سایت خاص (Gemini) شاخه if اضافه می‌شود
+  2) MutationObserver روی کل body — حتی با debounce روی صفحات DOM عظیم سنگین است
+  3) <all_urls> — Review فروشگاه سخت‌تر؛ کاربران نگران حریم خصوصی
+  4) تست end-to-end مرورگر کم است — رگرسیون دستی روی AI chatها
+
+برای scale به ۱۰۰k+ کاربر فعال:
+  • manifest matches محدود به preset hosts + chrome.scripting.registerContentScripts
+    دینامیک وقتی کاربر «همه سایت‌ها» را انتخاب کرد
+  • معماری plugin per-site: adapters/chatgpt.ts, gemini.ts, grok.ts
+  • Web Worker برای fixMixedText روی batchهای بزرگ DOM
+  • جدا کردن «فقط CSS» vs «مارکر» per adapter
+  • telemetry opt-in و crash reporting (Sentry) بدون محتوای متن
+
+برای scale به ۱M+:
+  • WASM build از core برای سرعت
+  • Safari/Firefox extension (WebExtensions مشترک)
+  • API SaaS: POST /fix { text, locale } برای اپ‌های third-party
+  • npm package @rtl-text-fixer/core با دانلود هفتگی بالا
+
+─── Scale محصول (بازار) ───
+
+بازار هدف طبیعی:
+  • کاربران فارسی/عربی در GitHub, ChatGPT, Claude, ایمیل وب، Notion, Confluence
+  • توسعه‌دهندگان Cursor/VS Code
+  • تیم‌های پشتیبانی دوزبانه
+
+رقبا / جایگزین:
+  • تنظیمات دستی dir=rtl در HTML
+  • افزونه‌های عمومی RTL browser
+  • مزیت این پروژه: تخصصی برای mixed-script + AI chat DOM
+
+تخمین واقع‌بینانه با تمرکز AI chat:
+  • نیش قوی: ۵۰k–۲۰۰k نصب Chrome ممکن با بازاریابی جامعه فارسی/توسعه‌دهنده
+  • VS Code marketplace: ۱k–۱۰k نصب اگر publish و README قوی باشد
+  • بدون publish/store و SEO: محدود به مخزن GitHub
+
+
+────────────────────────────────────────────────────────────────────────────────
+۶. ایده‌هایی که پروژه را «خیلی خفن» می‌کنند
+────────────────────────────────────────────────────────────────────────────────
+
+─── سطح ۱ — ارزش فوری (۳–۶ هفته) ───
+
+  • Firefox + Edge رسمی (همان کد MV3)
+  • Fix-on-paste در VS Code (تنظیم rtlFixer.fixOnPaste که در config رزرو شده)
+  • آیکون/وضعیت در popup: «این سایت پشتیبانی می‌شود / Gemini فقط CSS»
+  • per-site toggle در popup (بدون رفتن به exclude list)
+  • Safari iOS/macOS Shortcuts + Share extension با core مشترک
+  • CLI: npx rtl-text-fixer fix < file.txt
+  • قوانین exclude خودکار وقتی صفحه > N هزار node (محافظت hang)
+
+─── سطح ۲ — تمایز محصول (۲–۴ ماه) ───
+
+  • Site Adapters رسمی با تست snapshot DOM:
+      ChatGPT, Claude, Gemini, Grok, Copilot, Perplexity, WhatsApp Web, Telegram Web
+  • حالت «فقط پاسخ AI» vs «composer + پاسخ» در UI
+  • پشتیبانی markdown هوشمند: جداول، لیست، blockquote بدون شکستن syntax
+  • تشخیص زبان با Intl / compact language detector — عربی مصر vs فارسی
+  • OCR pipeline: عکس اسکرین‌شات → متن → fix (ادغام Tesseract یا API)
+  • همگام settings با sync رمزنگاری‌شده (اختیاری)
+
+─── سطح ۳ — پلتفرم / کسب‌وکار (۶–۱۸ ماه) ───
+
+  • npm + REST API + SDK (@rtl-text-fixer/core در CI اپ‌ها)
+  • افزونه Figma / Notion / Google Docs (منطق BiDi در ادیتورهای مستند)
+  • حالت سازمانی: لیست دامنه شرکت، غیرفعال‌سازی مرکزی
+  • Firefox for Android + keyboard IME helper (مارکر در سطح ورودی سیستم‌عامل)
+  • مدل ML سبک برای پیش‌بینی محل inserción مارکر (فقط جایی که heuristic fail می‌کند)
+  • dashboard وب: آمار نصب، نسخه، feedback — بدون ذخیره متن کاربر
+  • همکاری با BIDI-Forge / استاندارد Unicode در مستندات
+
+─── سطح ۴ — «wow factor» ───
+
+  • پیش‌نمایش زنده: قبل/بعد BiDi در canvas کنار composer
+  • Voice: TTS با ترتیب خواندن درست برای مخلوط فارسی–انگلیسی
+  • ادغام با Cursor Rules: auto-fix prompt قبل از ارسال به مدل
+  • VS Code Language Server: diagnostic روی خطوط mixed-script در PR review
+  • WASM در صفحه با <500KB — fix بدون ارسال متن به extension background
+  • Open-source «BiDi test suite» — golden files برای همه سایت‌های AI
+
+
+────────────────────────────────────────────────────────────────────────────────
+۷. نقشه راه پیشنهادی (اولویت‌بندی)
+────────────────────────────────────────────────────────────────────────────────
+
+  فاز A (ثبات): رفع hang، adapter registry، matches محدود، تست e2e Playwright روی ۳ chat
+  فاز B (رشد): publish VS Code + Chrome، README فارسی، ویدیو demo
+  فاز C (محصول): CLI + npm core، fix-on-paste، Grok/Telegram adapters
+  فاز D (پلتفرم): API، Firefox، سازمانی
+
+
+────────────────────────────────────────────────────────────────────────────────
+۸. خلاصه یک پاراگرافی
+────────────────────────────────────────────────────────────────────────────────
+
+RTL Text Fixer یک monorepo TypeScript است: core خالص برای درج مارکرهای Unicode
+BiDi در متن مخلوط فارسی/عربی/انگلیسی؛ افزونه VS Code برای اصلاح selection و
+کلیپ‌بورد و RTL UI اختیاری؛ افزونه Chrome برای اجرای خودکار روی DOM چت‌های AI
+با منطق جدا برای composer (ProseMirror/Quill) و پاسخ read-only. scale فنی با
+جداسازی adapter و محدود کردن inject قابل رشد به صدها هزار کاربر است؛ scale محصول
+در نیش جامعه فارسی‌زبان و توسعه‌دهندگان AI tooling قوی است. خفن‌شدن واقعی با
+site adapters تست‌شده، CLI/API، مرورگرهای بیشتر، fix-on-paste، و ادغام عمیق
+با Cursor/ChatGPT قبل از ارسال prompt اتفاق می‌افتد.
+
+
+================================================================================
+  پایان سند — برای به‌روزرسانی با تغییرات کد، نسخه‌ها را در package.json چک کنید.
+================================================================================

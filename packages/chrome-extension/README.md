@@ -2,7 +2,7 @@
 
 Manifest V3 extension that improves mixed Persian/Arabic + English readability by inserting Unicode bidi marks (LRM/RLM) into DOM text and editable fields.
 
-**Current version:** `0.3.3` (see `src/manifest.json`).
+**Current version:** `0.3.4` (see `src/manifest.json`).
 
 ## Build
 
@@ -27,7 +27,7 @@ pnpm -C packages/chrome-extension pack:store
 
 | Output | Path |
 |--------|------|
-| Upload ZIP | `store/release/rtl-text-fixer-chrome-0.3.0.zip` |
+| Upload ZIP | `store/release/rtl-text-fixer-chrome-0.3.4.zip` |
 | Store icon 128×128 | `store/promo/icon-128.png` |
 | Screenshot 1280×800 | `store/screenshots/screenshot-1280x800.png` |
 | Listing copy (EN) | `store/LISTING.md` |
@@ -83,7 +83,7 @@ You can paste full URLs in host lists; hostnames are extracted automatically.
 
 - Content script entry: `src/content.ts`.
 - **ProseMirror-style editors** (Claude, ChatGPT, …): while typing, only the **caret paragraph** is fixed (coalesced text-node update, no `execCommand` / `normalize()`). **Shift+Enter** gets a grace period so new lines are not fighting the fixer. On **blur**, all paragraphs are fixed. Bidi CSS hints apply **once** per composer (reduces Gemini layout jumping). Wired editors get `dir="auto"` and `unicode-bidi: plaintext`.
-- **Gemini (Quill)**: `geminiQuill.ts` on `gemini.google.com` only — **CSS** (`dir=auto`, `unicode-bidi: plaintext`) on `rich-textarea` and each `<p>`; removes Quill `ql-direction-rtl`. **No LRM/RLM in the composer** (markers break Quill spans). Debounced **strip** of stray markers only. Assistant replies use Gemini-specific selectors, not `.ProseMirror`.
+- **Gemini + Grok + ChatGPT composers** (`cssOnlyComposer.ts`): **CSS only** (`dir=auto`, `unicode-bidi: plaintext`) — **no LRM/RLM while typing** (Quill/ProseMirror spans break). Debounced strip of stray markers. Sites: `gemini.google.com`, `grok.com`, `x.ai`, X/Twitter `/grok`, `chatgpt.com`, `openai.com`.
 - **Open shadow roots**: composer UI may live under shadow DOM; `src/domDeep.ts` + extra `MutationObserver`s on `ShadowRoot` cover those trees.
 - Scope logic: `src/siteScope.ts`, storage keys in `src/storage.ts`.
 - Built-in preset list lives in `BUILTIN_PRESET_HOSTS` in `siteScope.ts` (includes Google-related hosts used by Gemini embeds, e.g. `ogs.google.com`); update when major AI UIs change domains.
