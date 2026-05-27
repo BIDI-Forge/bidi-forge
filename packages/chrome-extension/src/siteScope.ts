@@ -26,6 +26,8 @@ export const BUILTIN_PRESET_HOSTS: readonly string[] = [
   "x.com",
   "twitter.com",
   "x.ai",
+  "grok.com",
+  "grok.x.com",
   "chat.qwen.ai",
   "qwenlm.ai",
   "meta.ai",

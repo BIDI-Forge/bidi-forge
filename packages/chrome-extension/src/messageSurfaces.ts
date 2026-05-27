@@ -7,7 +7,7 @@ import { fixMixedText, stripBidiMarkers } from "@rtl-text-fixer/core";
 
 import { fixBlockCoalescedTextNodes, shouldFixMixedText } from "./blockFix.js";
 import { querySelectorAllDeepFrom } from "./domDeep.js";
-import { isGeminiHost, isInsideGeminiComposer } from "./geminiQuill.js";
+import { isChatGptHost, isGeminiHost, isGrokSurface, isInsideCssOnlyComposer } from "./cssOnlyComposer.js";
 
 const EDITABLE_SELECTOR =
   '[contenteditable="true"],textarea,[role="textbox"][contenteditable="true"]';
@@ -23,6 +23,15 @@ const CLAUDE_MESSAGE_ROOTS = [
 
 /** ProseMirror output that is not the live composer. */
 const GENERIC_READONLY_PROSE = '.ProseMirror:not([contenteditable="true"])';
+
+const CHATGPT_MESSAGE_ROOTS = ["[data-message-author-role]"];
+
+/** Grok / xAI chat — avoid matching the live composer ProseMirror. */
+const GROK_MESSAGE_ROOTS = [
+  '[data-testid*="message"]',
+  '[class*="message-content"]',
+  '[class*="response"]',
+];
 
 /** Gemini assistant output — avoid `.ProseMirror` (matches the live Quill composer). */
 const GEMINI_MESSAGE_ROOTS = [
@@ -41,8 +50,14 @@ export function isClaudeLikeHost(hostname: string): boolean {
   return h === "claude.ai" || h.endsWith(".claude.ai") || h.includes("anthropic.com");
 }
 
-export function getMessageRootSelectors(hostname: string): string[] {
+export { isChatGptHost } from "./cssOnlyComposer.js";
+
+export function getMessageRootSelectors(hostname: string, pathname = ""): string[] {
   if (isGeminiHost(hostname)) return GEMINI_MESSAGE_ROOTS;
+  if (isGrokSurface(hostname, pathname)) {
+    return [...GROK_MESSAGE_ROOTS, GENERIC_READONLY_PROSE];
+  }
+  if (isChatGptHost(hostname)) return [...CHATGPT_MESSAGE_ROOTS, GENERIC_READONLY_PROSE];
   if (isClaudeLikeHost(hostname)) {
     return [...CLAUDE_MESSAGE_ROOTS, GENERIC_READONLY_PROSE];
   }
@@ -103,13 +118,19 @@ function fixReadOnlyBlock(block: HTMLElement): boolean {
 }
 
 function isStillStreaming(root: HTMLElement): boolean {
-  const streaming = root.closest('[data-is-streaming="true"]');
-  return streaming instanceof HTMLElement;
+  if (root.closest('[data-is-streaming="true"]')) return true;
+  if (root.matches(".result-streaming, .streaming")) return true;
+  if (root.querySelector(".result-streaming, .streaming")) return true;
+  const busy = root.closest('[aria-busy="true"]');
+  return busy instanceof HTMLElement;
 }
 
-function processMessageRoot(root: HTMLElement, hostname: string): void {
+/** Fix read-only message container (call inside mutation-suppress guard). */
+export function scanMessageRoot(root: HTMLElement, hostname: string): void {
   if (isInsideEditable(root)) return;
-  if (isInsideGeminiComposer(root, hostname)) return;
+  if (isInsideCssOnlyComposer(root, hostname)) return;
+  if (root.id === "prompt-textarea") return;
+  if (root.closest("#prompt-textarea")) return;
   if (root.closest("rich-textarea, .ql-container, .ql-editor")) return;
   if (isStillStreaming(root)) return;
 
@@ -122,9 +143,11 @@ function processMessageRoot(root: HTMLElement, hostname: string): void {
   if (lastRootSignature.get(root) === signature) return;
 
   for (const block of root.querySelectorAll(MESSAGE_BLOCK_SELECTOR)) {
-    if (block instanceof HTMLElement && !isInsideEditable(block)) {
-      fixReadOnlyBlock(block);
-    }
+    if (!(block instanceof HTMLElement)) continue;
+    if (isInsideEditable(block)) continue;
+    if (isInsideCssOnlyComposer(block, hostname)) continue;
+    if (block.closest("#prompt-textarea")) continue;
+    fixReadOnlyBlock(block);
   }
 
   lastRootSignature.set(root, stripBidiMarkers(root.textContent ?? ""));
@@ -133,10 +156,10 @@ function processMessageRoot(root: HTMLElement, hostname: string): void {
 /**
  * Scan assistant/user message containers for BiDi CSS + marker fixes.
  */
-export function scanMessageSurfaces(doc: Document, hostname: string): void {
+export function scanMessageSurfaces(doc: Document, hostname: string, pathname = ""): void {
   if (!doc.body) return;
 
-  const selectors = getMessageRootSelectors(hostname);
+  const selectors = getMessageRootSelectors(hostname, pathname);
   const seen = new Set<Element>();
 
   for (const sel of selectors) {
@@ -145,32 +168,36 @@ export function scanMessageSurfaces(doc: Document, hostname: string): void {
       if (seen.has(el)) continue;
       seen.add(el);
       if (isInsideEditable(el)) continue;
-      if (isInsideGeminiComposer(el, hostname)) continue;
-      processMessageRoot(el, hostname);
+      if (isInsideCssOnlyComposer(el, hostname)) continue;
+      scanMessageRoot(el, hostname);
     }
   }
 }
 
-export function scanMessageSurfacesFromElement(el: Element, hostname: string): void {
+export function scanMessageSurfacesFromElement(
+  el: Element,
+  hostname: string,
+  pathname = "",
+): void {
   const doc = el.ownerDocument;
   if (!doc) return;
-  const selectors = getMessageRootSelectors(hostname);
+  const selectors = getMessageRootSelectors(hostname, pathname);
   for (const sel of selectors) {
     if (
       el.matches(sel) &&
       el instanceof HTMLElement &&
       !isInsideEditable(el) &&
-      !isInsideGeminiComposer(el, hostname)
+      !isInsideCssOnlyComposer(el, hostname)
     ) {
-      processMessageRoot(el, hostname);
+      scanMessageRoot(el, hostname);
     }
     for (const found of el.querySelectorAll(sel)) {
       if (
         found instanceof HTMLElement &&
         !isInsideEditable(found) &&
-        !isInsideGeminiComposer(found, hostname)
+        !isInsideCssOnlyComposer(found, hostname)
       ) {
-        processMessageRoot(found, hostname);
+        scanMessageRoot(found, hostname);
       }
     }
   }

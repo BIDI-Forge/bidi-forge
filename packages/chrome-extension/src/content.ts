@@ -3,13 +3,18 @@ import { fixMixedText, stripBidiMarkers as stripBidiMarkersCore } from "@rtl-tex
 import { tryFixMixedBlockCoalesced } from "./blockFix.js";
 import { hookShadowRootsInTree, querySelectorAllDeepFrom } from "./domDeep.js";
 import {
-  applyGeminiQuillBidiOverrides,
-  isGeminiQuillComposer,
+  applyCssOnlyBidiOverrides,
+  isCssOnlyComposer,
   isGoogleAiHost,
-  maintainGeminiComposer,
-  resolveGeminiQuillEditor,
-} from "./geminiQuill.js";
-import { scanMessageSurfaces, scanMessageSurfacesFromElement } from "./messageSurfaces.js";
+  isInsideCssOnlyComposer,
+  maintainCssOnlyComposer,
+  resolveCssOnlyEditor,
+} from "./cssOnlyComposer.js";
+import {
+  scanMessageRoot,
+  scanMessageSurfaces,
+  scanMessageSurfacesFromElement,
+} from "./messageSurfaces.js";
 import { getExtensionRuntimeState, SYNC_SETTING_KEYS } from "./storage.js";
 import { computeEffectiveEnabled } from "./siteScope.js";
 
@@ -21,8 +26,12 @@ const EDITABLE_SELECTOR =
   'textarea,[contenteditable]:not([contenteditable="false"]),[role="textbox"][contenteditable]:not([contenteditable="false"])';
 const SKIP_FIX_SELECTOR = "pre,code,script,style";
 const COMPOSER_INPUT_DEBOUNCE_MS = 450;
-const GEMINI_MAINTAIN_DEBOUNCE_MS = 280;
+const CSS_ONLY_MAINTAIN_DEBOUNCE_MS = 400;
 const COMPOSER_AFTER_ENTER_GRACE_MS = 750;
+const MUTATION_BATCH_MS = 32;
+const WIRE_EDITABLES_DEBOUNCE_MS = 500;
+const MESSAGE_ROOT_SCAN_MS = 450;
+const INITIAL_SCAN_IDLE_MS = 1500;
 
 const PERSIAN_RE = /[\u0600-\u06FF]/;
 const ENGLISH_RE = /[a-zA-Z]/;
@@ -46,6 +55,49 @@ function isInsideEditable(node: Node): boolean {
   if (!el) return false;
   const editable = el.closest?.(EDITABLE_SELECTOR);
   return Boolean(editable);
+}
+
+const MESSAGE_SURFACE_SELECTOR =
+  '.ProseMirror:not([contenteditable="true"]):not(#prompt-textarea), [data-message-author-role], .markdown, .message-content, .standard-markdown';
+
+function isInsideMessageSurface(node: Node): boolean {
+  const el = closestElement(node);
+  return Boolean(el?.closest(MESSAGE_SURFACE_SELECTOR));
+}
+
+function findMessageRootForNode(node: Node): HTMLElement | null {
+  const el = closestElement(node);
+  if (!el) return null;
+  const host = currentHostname();
+  if (isInsideCssOnlyComposer(el, host)) return null;
+  const root = el.closest(MESSAGE_SURFACE_SELECTOR);
+  if (!(root instanceof HTMLElement)) return null;
+  if (isInsideCssOnlyComposer(root, host)) return null;
+  if (root.isContentEditable) return null;
+  return root;
+}
+
+function maintainCssOnlyComposerSafe(
+  editor: HTMLElement,
+  guardEl: Element,
+  scope: "caret" | "all" = "caret",
+): void {
+  if (cssOnlyMaintaining.has(editor)) return;
+  cssOnlyMaintaining.add(editor);
+  programmaticEdit.add(guardEl);
+  runWithoutMutationFeedback(() => {
+    maintainCssOnlyComposer(editor, scope);
+  });
+  programmaticEdit.delete(guardEl);
+  cssOnlyMaintaining.delete(editor);
+}
+
+function isMainContentFrame(): boolean {
+  try {
+    return window.self === window.top;
+  } catch {
+    return true;
+  }
 }
 
 function isEditableElement(
@@ -154,8 +206,8 @@ function applyShadowHostBidiHintsFrom(leaf: HTMLElement): void {
  */
 function applyComposerBidiHintsForSurface(el: HTMLElement): void {
   const host = currentHostname();
-  if (isGeminiQuillComposer(host, el)) {
-    applyGeminiQuillBidiOverrides(el);
+  if (isCssOnlyComposer(host, el)) {
+    applyCssOnlyBidiOverrides(host, el);
     if (isLikelyGoogleAiSurface(host)) applyShadowHostBidiHintsFrom(el);
     return;
   }
@@ -178,26 +230,6 @@ function firstEditableAncestor(start: EventTarget | null): Element | null {
     n = parent;
   }
   return null;
-}
-
-function walkTextNodesDeep(start: Element, handle: (t: Text) => void): void {
-  const go = (n: Node) => {
-    if (n.nodeType === Node.TEXT_NODE) {
-      const t = n as Text;
-      if (!t.nodeValue?.trim()) return;
-      if (isInSkippedContainer(t)) return;
-      handle(t);
-      return;
-    }
-    if (n.nodeType !== Node.ELEMENT_NODE) return;
-    const el = n as Element;
-    if (el.matches(SKIP_FIX_SELECTOR)) return;
-    for (const c of Array.from(el.childNodes)) go(c);
-    if (el.shadowRoot) {
-      for (const c of Array.from(el.shadowRoot.childNodes)) go(c);
-    }
-  };
-  go(start);
 }
 
 function fixTextarea(el: HTMLTextAreaElement): void {
@@ -252,11 +284,11 @@ function fixContentEditableRoot(root: HTMLElement, mode: "typing" | "full" = "ty
   if (isInSkippedContainer(root)) return false;
 
   const host = currentHostname();
-  if (isGeminiQuillComposer(host, root)) {
-    applyGeminiQuillBidiOverrides(root);
+  if (isCssOnlyComposer(host, root)) {
+    applyCssOnlyBidiOverrides(host, root);
     if (mode === "typing") return false;
-    const editor = resolveGeminiQuillEditor(root);
-    if (editor) maintainGeminiComposer(editor);
+    const editor = resolveCssOnlyEditor(host, root);
+    if (editor) maintainCssOnlyComposerSafe(editor, root, "all");
     return true;
   }
 
@@ -294,6 +326,7 @@ export function fixTextNode(textNode: Text): void {
   if (!enabled) return;
   if (isInSkippedContainer(textNode)) return;
   if (isInsideEditable(textNode)) return;
+  if (isInsideMessageSurface(textNode)) return;
 
   const original = textNode.nodeValue ?? "";
   const last = lastProcessedText.get(textNode);
@@ -307,33 +340,23 @@ export function fixTextNode(textNode: Text): void {
   lastProcessedText.set(textNode, textNode.nodeValue ?? "");
 }
 
-function walkAndFix(root: Node): void {
-  if (root.nodeType === Node.ELEMENT_NODE) walkTextNodesDeep(root as Element, fixTextNode);
-}
-
 function scanSubtreeFromElement(el: Element): void {
   if (!enabled) return;
   if (isInSkippedContainer(el)) return;
   if (isEditableElement(el) || isInsideEditable(el)) return;
-  walkAndFix(el);
-  scanMessageSurfacesFromElement(el, currentHostname());
-  for (const node of querySelectorAllDeepFrom(el, EDITABLE_SELECTOR)) ensureEditableWired(node);
-  hookShadowRootsInTree(el, (sr) => ensureObserverForShadowRoot(sr));
-  for (const iframe of el.querySelectorAll("iframe")) tryInitIframe(iframe as HTMLIFrameElement);
+  runWithoutMutationFeedback(() =>
+    scanMessageSurfacesFromElement(el, currentHostname(), currentPathname()),
+  );
+  scheduleWireEditablesFrom(el);
+  scheduleShadowRootsHook(el);
 }
 
 export function scanDocument(doc: Document): void {
   if (!enabled) return;
   if (!doc.body) return;
-  walkAndFix(doc.body);
-  scanMessageSurfaces(doc, currentHostname());
-
-  for (const el of querySelectorAllDeepFrom(doc, EDITABLE_SELECTOR)) ensureEditableWired(el);
-
-  hookShadowRootsInTree(doc.body, (sr) => ensureObserverForShadowRoot(sr));
-
-  const iframes = Array.from(doc.querySelectorAll("iframe"));
-  for (const iframe of iframes) tryInitIframe(iframe);
+  runWithoutMutationFeedback(() => scanMessageSurfaces(doc, currentHostname(), currentPathname()));
+  scheduleWireEditablesFrom(doc.body);
+  scheduleShadowRootsHook(doc.body);
 }
 
 type ContentMessage =
@@ -343,7 +366,6 @@ type ContentMessage =
 
 let enabled = false;
 let focusInWireHandler: ((ev: Event) => void) | undefined;
-const iframeFocusDocWired = new WeakSet<Document>();
 const observers = new Map<Document | ShadowRoot, MutationObserver>();
 let queued = new Set<Node>();
 let scheduled = false;
@@ -358,7 +380,74 @@ const lastAppliedComparableText = new WeakMap<Element, string>();
 const scheduledInputFix = new WeakMap<Element, number>();
 const skipComposerFixUntil = new WeakMap<Element, number>();
 const composerScheduleByEditable = new WeakMap<Element, () => void>();
+const cssOnlyMaintaining = new WeakSet<HTMLElement>();
 const lastProcessedText = new WeakMap<Text, string>();
+let suppressMutationHandling = 0;
+let pendingMutations: MutationRecord[] = [];
+let mutationBatchTimer: number | undefined;
+const pendingWireRoots = new Set<Element>();
+let wireEditablesTimer: number | undefined;
+const pendingShadowHookRoots = new Set<Element>();
+const messageRootScanTimers = new WeakMap<HTMLElement, number>();
+
+function runWithoutMutationFeedback(fn: () => void): void {
+  suppressMutationHandling++;
+  try {
+    fn();
+  } finally {
+    suppressMutationHandling--;
+  }
+}
+
+function scheduleMessageRootScan(root: HTMLElement): void {
+  const prev = messageRootScanTimers.get(root);
+  if (prev !== undefined) window.clearTimeout(prev);
+  const id = window.setTimeout(() => {
+    messageRootScanTimers.delete(root);
+    if (!enabled || !root.isConnected) return;
+    runWithoutMutationFeedback(() => scanMessageRoot(root, currentHostname()));
+  }, MESSAGE_ROOT_SCAN_MS);
+  messageRootScanTimers.set(root, id);
+}
+
+function flushWireAndShadowHooks(): void {
+  wireEditablesTimer = undefined;
+
+  const wireRoots = Array.from(pendingWireRoots);
+  const shadowRoots = Array.from(pendingShadowHookRoots);
+  pendingWireRoots.clear();
+  pendingShadowHookRoots.clear();
+
+  const wired = new Set<Element>();
+  for (const root of wireRoots) {
+    if (!root.isConnected) continue;
+    for (const node of querySelectorAllDeepFrom(root, EDITABLE_SELECTOR)) {
+      if (wired.has(node)) continue;
+      wired.add(node);
+      ensureEditableWired(node);
+    }
+  }
+
+  for (const root of shadowRoots) {
+    if (!root.isConnected) continue;
+    hookShadowRootsInTree(root, (sr) => ensureObserverForShadowRoot(sr));
+  }
+}
+
+function scheduleDeferredHooks(root: Element): void {
+  pendingWireRoots.add(root);
+  pendingShadowHookRoots.add(root);
+  if (wireEditablesTimer !== undefined) window.clearTimeout(wireEditablesTimer);
+  wireEditablesTimer = window.setTimeout(flushWireAndShadowHooks, WIRE_EDITABLES_DEBOUNCE_MS);
+}
+
+function scheduleWireEditablesFrom(root: Element): void {
+  scheduleDeferredHooks(root);
+}
+
+function scheduleShadowRootsHook(root: Element): void {
+  scheduleDeferredHooks(root);
+}
 
 function requestIdle(cb: () => void, timeoutMs: number): number | undefined {
   const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number })
@@ -437,11 +526,12 @@ function flushQueue(): void {
   if (queued.size > 0) scheduleFlush();
 }
 
-function wireGeminiComposerEditable(el: Element): void {
+function wireCssOnlyComposerEditable(el: Element): void {
   if (!(el instanceof HTMLElement)) return;
+  const host = currentHostname();
   applyComposerBidiHintsForSurface(el);
 
-  const editor = resolveGeminiQuillEditor(el);
+  const editor = resolveCssOnlyEditor(host, el);
   const scheduleMaintain = () => {
     if (!enabled) return;
     if (programmaticEdit.has(el)) return;
@@ -452,10 +542,10 @@ function wireGeminiComposerEditable(el: Element): void {
     if (prev !== undefined) window.clearTimeout(prev);
     const id = window.setTimeout(() => {
       scheduledInputFix.delete(el);
-      const ed = resolveGeminiQuillEditor(el);
-      if (ed) maintainGeminiComposer(ed);
-      else if (el instanceof HTMLElement) applyGeminiQuillBidiOverrides(el);
-    }, GEMINI_MAINTAIN_DEBOUNCE_MS);
+      const ed = resolveCssOnlyEditor(host, el);
+      if (ed) maintainCssOnlyComposerSafe(ed, el);
+      else applyCssOnlyBidiOverrides(host, el);
+    }, CSS_ONLY_MAINTAIN_DEBOUNCE_MS);
     scheduledInputFix.set(el, id);
   };
 
@@ -472,8 +562,8 @@ function wireGeminiComposerEditable(el: Element): void {
     () => {
       window.setTimeout(() => {
         if (!enabled || programmaticEdit.has(el)) return;
-        const ed = resolveGeminiQuillEditor(el);
-        if (ed) maintainGeminiComposer(ed);
+        const ed = resolveCssOnlyEditor(host, el);
+        if (ed) maintainCssOnlyComposerSafe(ed, el);
       }, 0);
     },
     { passive: true },
@@ -494,14 +584,14 @@ function wireGeminiComposerEditable(el: Element): void {
       if (prev !== undefined) window.clearTimeout(prev);
       scheduledInputFix.delete(el);
       if (!enabled || programmaticEdit.has(el)) return;
-      const ed = resolveGeminiQuillEditor(el);
-      if (ed) maintainGeminiComposer(ed);
+      const ed = resolveCssOnlyEditor(host, el);
+      if (ed) maintainCssOnlyComposerSafe(ed, el, "all");
     },
     { passive: true },
   );
 
-  if (editor) maintainGeminiComposer(editor);
-  else applyGeminiQuillBidiOverrides(el);
+  if (editor) maintainCssOnlyComposerSafe(editor, el, "all");
+  else applyCssOnlyBidiOverrides(host, el);
 }
 
 function ensureEditableWired(el: Element): void {
@@ -510,8 +600,8 @@ function ensureEditableWired(el: Element): void {
   if (wiredEditables.has(el)) return;
   wiredEditables.add(el);
 
-  if (isGeminiQuillComposer(currentHostname(), el)) {
-    wireGeminiComposerEditable(el);
+  if (isCssOnlyComposer(currentHostname(), el)) {
+    wireCssOnlyComposerEditable(el);
     return;
   }
 
@@ -589,40 +679,27 @@ function ensureEditableWired(el: Element): void {
   window.setTimeout(() => runFix("typing"), 0);
 }
 
-function tryInitIframe(iframe: HTMLIFrameElement): void {
-  if (!enabled) return;
-  try {
-    const doc = iframe.contentDocument;
-    if (!doc) return;
-    ensureObserverForDocument(doc);
-    scanDocument(doc);
-    if (!iframeFocusDocWired.has(doc)) {
-      iframeFocusDocWired.add(doc);
-      doc.addEventListener("focusin", onFocusInWireComposer, true);
-    }
-  } catch {
-    // Cross-origin iframe; ignore.
-  }
-}
-
 function wireComposerFromNode(node: Node): void {
   const editable = firstEditableAncestor(node);
   if (!editable || !isEditableElement(editable)) return;
+  const host = currentHostname();
+  if (wiredEditables.has(editable) && isCssOnlyComposer(host, editable)) return;
   ensureEditableWired(editable);
+  if (isCssOnlyComposer(host, editable)) return;
   composerScheduleByEditable.get(editable)?.();
 }
 
-function ensureEditablesWiredInTree(root: Element): void {
-  for (const node of querySelectorAllDeepFrom(root, EDITABLE_SELECTOR)) {
-    ensureEditableWired(node);
-  }
-}
-
-function onDomMutation(mutations: MutationRecord[]): void {
+function handleDomMutations(mutations: MutationRecord[]): void {
   for (const m of mutations) {
     if (m.type === "characterData" && m.target.nodeType === Node.TEXT_NODE) {
       if (isInsideEditable(m.target)) {
+        if (isInsideCssOnlyComposer(m.target, currentHostname())) continue;
         wireComposerFromNode(m.target);
+        continue;
+      }
+      const msgRoot = findMessageRootForNode(m.target);
+      if (msgRoot) {
+        scheduleMessageRootScan(msgRoot);
         continue;
       }
       enqueueNode(m.target);
@@ -633,21 +710,45 @@ function onDomMutation(mutations: MutationRecord[]): void {
       const addedNodes = Array.from(m.addedNodes as unknown as NodeListOf<Node>);
       for (const added of addedNodes) {
         if (isInsideEditable(added)) {
+          if (isInsideCssOnlyComposer(added, currentHostname())) continue;
           wireComposerFromNode(added);
           continue;
         }
         if (added.nodeType === Node.ELEMENT_NODE) {
-          ensureEditablesWiredInTree(added as Element);
+          const el = added as Element;
+          scheduleWireEditablesFrom(el);
+          scheduleShadowRootsHook(el);
+          if (el.matches(MESSAGE_SURFACE_SELECTOR) && el instanceof HTMLElement) {
+            if (!isInsideCssOnlyComposer(el, currentHostname()) && !el.isContentEditable) {
+              scheduleMessageRootScan(el);
+            }
+          } else {
+            const msgRoot = findMessageRootForNode(el);
+            if (msgRoot) scheduleMessageRootScan(msgRoot);
+            else enqueueNode(el);
+          }
+          continue;
         }
-        if (added.nodeType === Node.TEXT_NODE || added.nodeType === Node.ELEMENT_NODE) {
-          enqueueNode(added);
-        }
-        if (added.nodeType === Node.ELEMENT_NODE) {
-          hookShadowRootsInTree(added as Element, (sr) => ensureObserverForShadowRoot(sr));
+        if (added.nodeType === Node.TEXT_NODE) {
+          const msgRoot = findMessageRootForNode(added);
+          if (msgRoot) scheduleMessageRootScan(msgRoot);
+          else enqueueNode(added);
         }
       }
     }
   }
+}
+
+function onDomMutation(mutations: MutationRecord[]): void {
+  if (suppressMutationHandling > 0) return;
+  pendingMutations.push(...mutations);
+  if (mutationBatchTimer !== undefined) return;
+  mutationBatchTimer = window.setTimeout(() => {
+    mutationBatchTimer = undefined;
+    const batch = pendingMutations;
+    pendingMutations = [];
+    handleDomMutations(batch);
+  }, MUTATION_BATCH_MS);
 }
 
 function ensureObserverForShadowRoot(sr: ShadowRoot): void {
@@ -659,10 +760,7 @@ function ensureObserverForShadowRoot(sr: ShadowRoot): void {
   observers.set(sr, obs);
 
   for (const c of Array.from(sr.children)) {
-    if (c instanceof Element) {
-      ensureEditablesWiredInTree(c);
-      scanSubtreeFromElement(c);
-    }
+    if (c instanceof Element) scheduleWireEditablesFrom(c);
   }
 }
 
@@ -684,16 +782,25 @@ function onFocusInWireComposer(ev: Event): void {
   if (found) ensureEditableWired(found);
 }
 
+function runInitialScan(): void {
+  if (!enabled) return;
+  runWithoutMutationFeedback(() => scanDocument(document));
+}
+
 function startObservers(): void {
-  // Initialize the top-level document and best-effort same-origin iframes.
   ensureObserverForDocument(document);
-  scanDocument(document);
+
+  const runInitial = () => {
+    if (!enabled) return;
+    runInitialScan();
+  };
+  const idle = requestIdle(runInitial, INITIAL_SCAN_IDLE_MS);
+  if (idle === undefined) {
+    window.setTimeout(runInitial, 300);
+  }
 
   focusInWireHandler = onFocusInWireComposer;
   document.addEventListener("focusin", focusInWireHandler, true);
-
-  const iframes = Array.from(document.querySelectorAll("iframe"));
-  for (const iframe of iframes) tryInitIframe(iframe);
 }
 
 function stopObservers(): void {
@@ -707,6 +814,17 @@ function stopObservers(): void {
   observers.clear();
   queued.clear();
   clearScheduledWork();
+  if (mutationBatchTimer !== undefined) {
+    window.clearTimeout(mutationBatchTimer);
+    mutationBatchTimer = undefined;
+  }
+  pendingMutations = [];
+  if (wireEditablesTimer !== undefined) {
+    window.clearTimeout(wireEditablesTimer);
+    wireEditablesTimer = undefined;
+  }
+  pendingWireRoots.clear();
+  pendingShadowHookRoots.clear();
 }
 
 function applyEnabled(next: boolean): void {
@@ -737,14 +855,16 @@ function currentHostname(): string {
   return window.location.hostname.toLowerCase();
 }
 
+function currentPathname(): string {
+  return window.location.pathname;
+}
+
 async function readEffectiveEnabled(): Promise<boolean> {
   const state = await getExtensionRuntimeState();
   return computeEffectiveEnabled(state.enabled, currentHostname(), state.site);
 }
 
-async function init(): Promise<void> {
-  applyEnabled(await readEffectiveEnabled());
-
+function wireRuntimeListeners(): void {
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName !== "sync") return;
     if (!SYNC_SETTING_KEYS.some((k) => changes[k])) return;
@@ -762,6 +882,14 @@ async function init(): Promise<void> {
       sendResponse?.({ enabled });
     }
   });
+}
+
+async function init(): Promise<void> {
+  wireRuntimeListeners();
+
+  if (!isMainContentFrame()) return;
+
+  applyEnabled(await readEffectiveEnabled());
 }
 
 void init();

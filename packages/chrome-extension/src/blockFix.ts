@@ -1,5 +1,7 @@
 import { fixMixedText, stripBidiMarkers } from "@rtl-text-fixer/core";
 
+import { isInsideCssOnlyComposer } from "./cssOnlyComposer.js";
+
 const PERSIAN_RE = /[\u0600-\u06FF]/;
 const ENGLISH_RE = /[a-zA-Z]/;
 const BIDI_MARKER_RE = /[\u200E\u200F\u2066-\u2069]/;
@@ -133,6 +135,9 @@ export function tryFixMixedBlockCoalesced(block: HTMLElement): boolean {
   if (block.closest("pre")) return false;
   if (block.matches("pre, code, kbd, samp")) return false;
   if (block.querySelector("pre, code, kbd, samp, a[href]")) return false;
+
+  const host = typeof location !== "undefined" ? location.hostname : "";
+  if (host && isInsideCssOnlyComposer(block, host)) return false;
 
   const raw = stripBidiMarkers(block.textContent ?? "");
   if (!raw.trim() || !shouldFixMixedText(raw)) return false;

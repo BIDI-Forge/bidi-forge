@@ -12,18 +12,57 @@ import {
 
 const checkbox = document.getElementById("enabled") as HTMLInputElement | null;
 const statusEl = document.getElementById("status") as HTMLSpanElement | null;
+const statusDetailEl = document.getElementById("statusDetail") as HTMLSpanElement | null;
+const statusBar = document.getElementById("statusBar");
+const scopeHintEl = document.getElementById("scopeHint");
+const hostBlock = document.getElementById("hostBlock");
+const versionEl = document.getElementById("version");
 const scopeRadios = Array.from(document.querySelectorAll<HTMLInputElement>('input[name="siteScope"]'));
 const includeHostsEl = document.getElementById("includeHosts") as HTMLTextAreaElement | null;
 const excludeHostsEl = document.getElementById("excludeHosts") as HTMLTextAreaElement | null;
 
-function setStatus(text: string, tone: "ok" | "off" | "error" | "loading"): void {
-  if (!statusEl) return;
-  statusEl.textContent = text;
+function setVersionLabel(): void {
+  if (!versionEl) return;
+  try {
+    versionEl.textContent = `v${chrome.runtime.getManifest().version}`;
+  } catch {
+    versionEl.textContent = "v0.3.4";
+  }
+}
+
+function setPowered(on: boolean): void {
+  document.body.dataset.powered = on ? "on" : "off";
+}
+
+function setStatus(
+  primary: string,
+  tone: "ok" | "off" | "error" | "loading",
+  secondary = "",
+): void {
+  if (statusEl) statusEl.textContent = primary;
+  if (statusDetailEl) statusDetailEl.textContent = secondary;
+  if (!statusBar) return;
   if (tone === "loading") {
-    statusEl.removeAttribute("data-tone");
+    statusBar.removeAttribute("data-tone");
     return;
   }
-  statusEl.setAttribute("data-tone", tone);
+  statusBar.setAttribute("data-tone", tone);
+}
+
+function statusForState(enabled: boolean, mode: SiteScopeMode): { primary: string; secondary: string } {
+  if (!enabled) {
+    return { primary: "Paused", secondary: "Turn on to fix mixed RTL/LTR text" };
+  }
+  if (mode === "presets") {
+    return {
+      primary: "Ready on Claude.ai",
+      secondary: "Claude.ai + ChatGPT, Gemini, Grok, Qwen · Copilot/Perplexity/DeepSeek soon",
+    };
+  }
+  return {
+    primary: "Active on all sites",
+    secondary: "Heavier mode — prefer AI chats if tabs feel slow",
+  };
 }
 
 function debounce<T extends unknown[]>(fn: (...args: T) => void, ms: number): (...args: T) => void {
@@ -39,56 +78,85 @@ function selectedScopeMode(): SiteScopeMode {
   return checked?.value === "presets" ? "presets" : "all";
 }
 
-function syncIncludeDisabled(): void {
-  if (!includeHostsEl) return;
-  includeHostsEl.disabled = selectedScopeMode() === "all";
+function syncScopeUi(): void {
+  const mode = selectedScopeMode();
+  const allSites = mode === "all";
+
+  if (includeHostsEl) includeHostsEl.disabled = allSites;
+  hostBlock?.setAttribute("data-dimmed", allSites ? "true" : "false");
+
+  if (scopeHintEl) {
+    scopeHintEl.textContent = allSites
+      ? "Every tab when enabled — higher CPU use"
+      : "Claude.ai first · ChatGPT, Gemini, Grok, Qwen (default)";
+  }
+
+  if (checkbox?.checked) {
+    const { primary, secondary } = statusForState(true, mode);
+    setStatus(primary, "ok", secondary);
+  }
 }
+
+setVersionLabel();
 
 if (checkbox && includeHostsEl && excludeHostsEl && scopeRadios.length >= 2) {
   checkbox.disabled = true;
   includeHostsEl.disabled = true;
   excludeHostsEl.disabled = true;
   for (const r of scopeRadios) r.disabled = true;
-  setStatus("Loading…", "loading");
+  setStatus("Loading settings…", "loading");
 
   void Promise.all([getEnabled(), getSiteScopeSettings(), getIncludeHostsText(), getExcludeHostsText()])
     .then(([enabled, site, includeText, excludeText]) => {
       checkbox.checked = enabled;
       checkbox.disabled = false;
+      setPowered(enabled);
+
       for (const r of scopeRadios) {
         r.disabled = false;
-        r.checked = (r.value === "presets" && site.mode === "presets") || (r.value === "all" && site.mode === "all");
+        r.checked =
+          (r.value === "presets" && site.mode === "presets") ||
+          (r.value === "all" && site.mode === "all");
       }
+
       includeHostsEl.value = includeText;
       excludeHostsEl.value = excludeText;
-      syncIncludeDisabled();
       excludeHostsEl.disabled = false;
-      setStatus(enabled ? "Enabled and running." : "Disabled.", enabled ? "ok" : "off");
+      syncScopeUi();
+
+      const { primary, secondary } = statusForState(enabled, site.mode);
+      setStatus(primary, enabled ? "ok" : "off", secondary);
     })
     .catch(() => {
       checkbox.checked = true;
       checkbox.disabled = false;
+      setPowered(true);
+
       for (const r of scopeRadios) {
         r.disabled = false;
-        if (r.value === "all") r.checked = true;
+        if (r.value === "presets") r.checked = true;
       }
-      syncIncludeDisabled();
+
+      syncScopeUi();
       excludeHostsEl.disabled = false;
-      setStatus("Couldn’t read settings. Using defaults.", "error");
+      setStatus("Using safe defaults", "error", "Claude.ai presets · extension enabled");
     });
 
   checkbox.addEventListener("change", () => {
     const next = checkbox.checked;
     checkbox.disabled = true;
+    setPowered(next);
     setStatus("Saving…", "loading");
 
     void setEnabled(next)
       .then(() => {
-        setStatus(next ? "Enabled and running." : "Disabled.", next ? "ok" : "off");
+        const { primary, secondary } = statusForState(next, selectedScopeMode());
+        setStatus(primary, next ? "ok" : "off", secondary);
       })
       .catch(() => {
         checkbox.checked = !next;
-        setStatus("Couldn’t save setting. Try again.", "error");
+        setPowered(!next);
+        setStatus("Couldn’t save", "error", "Try toggling again");
       })
       .finally(() => {
         checkbox.disabled = false;
@@ -97,28 +165,25 @@ if (checkbox && includeHostsEl && excludeHostsEl && scopeRadios.length >= 2) {
 
   for (const r of scopeRadios) {
     r.addEventListener("change", () => {
-      syncIncludeDisabled();
-      const mode = selectedScopeMode();
-      setStatus("Saving…", "loading");
-      void setSiteScopeMode(mode)
-        .then(() => {
-          setStatus(checkbox.checked ? "Enabled and running." : "Disabled.", checkbox.checked ? "ok" : "off");
-        })
+      syncScopeUi();
+      setStatus("Saving scope…", "loading");
+      void setSiteScopeMode(selectedScopeMode())
+        .then(() => syncScopeUi())
         .catch(() => {
-          setStatus("Couldn’t save site scope.", "error");
+          setStatus("Couldn’t save scope", "error", "Check sync storage in Chrome");
         });
     });
   }
 
   const saveInclude = debounce((text: string) => {
     void setIncludeHostsText(text).catch(() => {
-      setStatus("Couldn’t save extra hosts.", "error");
+      setStatus("Extra hosts not saved", "error");
     });
   }, 450);
 
   const saveExclude = debounce((text: string) => {
     void setExcludeHostsText(text).catch(() => {
-      setStatus("Couldn’t save exclusions.", "error");
+      setStatus("Blocklist not saved", "error");
     });
   }, 450);
 

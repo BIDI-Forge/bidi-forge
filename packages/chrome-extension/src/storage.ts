@@ -24,8 +24,9 @@ export interface ExtensionRuntimeState {
 }
 
 function parseScopeMode(raw: unknown): SiteScopeMode {
-  if (raw === "presets") return "presets";
-  return "all";
+  if (raw === "all") return "all";
+  // Safe default: do not run on every tab unless explicitly selected.
+  return "presets";
 }
 
 function asHostListText(raw: unknown): string {
