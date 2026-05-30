@@ -9,8 +9,7 @@ chrome.runtime.onInstalled.addListener(() => {
     chrome.storage.sync.get([STORAGE_KEY_ENABLED, STORAGE_KEY_SITE_SCOPE], (result) => {
       const next: Record<string, unknown> = {};
       if (typeof result[STORAGE_KEY_ENABLED] === "undefined") next[STORAGE_KEY_ENABLED] = true;
-      // Safe default for first install and old profiles without scope.
-      if (typeof result[STORAGE_KEY_SITE_SCOPE] === "undefined") next[STORAGE_KEY_SITE_SCOPE] = "presets";
+      if (typeof result[STORAGE_KEY_SITE_SCOPE] === "undefined") next[STORAGE_KEY_SITE_SCOPE] = "all";
       if (Object.keys(next).length > 0) {
         chrome.storage.sync.set(next, () => resolve());
         return;
