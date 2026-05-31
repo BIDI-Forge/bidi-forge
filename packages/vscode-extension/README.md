@@ -75,3 +75,8 @@ Press `F5` with the repo launch config.
 | Notifications still wrong | Enable Custom CSS + reload; set `rtlFixer.uiMessageDirection` to `rtl` |
 | Chat input order wrong | Enable RTL UI v2 CSS; editor updates may require selector tweaks in `rtl-ui.css` |
 | Paths inverted in Quick Open | v2 uses `direction: auto` on quick input — reload after CSS update |
+
+## Related
+
+- **Chrome extension:** [BIDI - Forge on Chrome Web Store](https://chromewebstore.google.com/detail/ffngaifiipbklkbobombbgaeokinepdc)
+- **Monorepo:** [github.com/BIDI-Forge/bidi-forge](https://github.com/BIDI-Forge/bidi-forge)

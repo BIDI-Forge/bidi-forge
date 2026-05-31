@@ -4,7 +4,11 @@ Manifest V3 extension that improves mixed Persian/Arabic + English readability b
 
 **Current version:** `0.3.4` (see `src/manifest.json`).
 
-## Build
+## Install
+
+**Chrome Web Store:** [BIDI - Forge](https://chromewebstore.google.com/detail/ffngaifiipbklkbobombbgaeokinepdc)
+
+## Build (local / developers)
 
 From the repo root:
 

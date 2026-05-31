@@ -10,6 +10,8 @@ Fix mixed Persian (RTL) and English (LTR) text readability issues by automatical
 
 - **License**: MIT
 - **Version (VS Code extension)**: 0.2.0
+- **Version (Chrome extension)**: 0.3.4
+- **Chrome Web Store**: [BIDI - Forge](https://chromewebstore.google.com/detail/ffngaifiipbklkbobombbgaeokinepdc)
 - **Stack**: TypeScript + pnpm (workspace) + Node.js 18+
 
 ## Features
@@ -110,7 +112,9 @@ To run/debug locally:
 
 ### Chrome extension (Manifest V3)
 
-Build output is a loadable folder:
+**Install from Chrome Web Store:** [BIDI - Forge](https://chromewebstore.google.com/detail/ffngaifiipbklkbobombbgaeokinepdc)
+
+Build output for local development is a loadable folder:
 
 - `packages/chrome-extension/dist`
 
@@ -143,7 +147,7 @@ The popup provides an enable/disable toggle using `chrome.storage.sync`.
 pnpm -C packages/vscode-extension package
 ```
 
-- **Chrome**: build and load unpacked from `packages/chrome-extension/dist`:
+- **Chrome**: [Install from Chrome Web Store](https://chromewebstore.google.com/detail/ffngaifiipbklkbobombbgaeokinepdc) — or build and load unpacked from `packages/chrome-extension/dist`:
 
 ```bash
 pnpm -C packages/chrome-extension build
@@ -181,4 +185,4 @@ For open-source projects, the MIT License is a popular choice because it is simp
 ## Publishing
 
 - **VS Code**: from `packages/vscode-extension` run `pnpm package` to build a `.vsix`.
-- **Chrome**: run `pnpm -C packages/chrome-extension pack:store` then upload `store/release/rtl-text-fixer-chrome-*.zip` to the [Chrome Web Store Developer Console](https://chrome.google.com/webstore/devconsole). See `packages/chrome-extension/store/UPLOAD_GUIDE.md`.
+- **Chrome**: published on the [Chrome Web Store](https://chromewebstore.google.com/detail/ffngaifiipbklkbobombbgaeokinepdc). To build a store upload package locally, run `pnpm -C packages/chrome-extension pack:store` then upload `store/release/rtl-text-fixer-chrome-*.zip` to the [Chrome Web Store Developer Console](https://chrome.google.com/webstore/devconsole). See `packages/chrome-extension/store/UPLOAD_GUIDE.md`.
