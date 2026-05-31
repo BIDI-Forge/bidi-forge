@@ -1,4 +1,4 @@
-# RTL Text Fixer (VS Code / Cursor)
+# RTL Text Fixer (VS Code)
 
 Fix mixed Persian (RTL) and English (LTR) text readability using Unicode bidirectional markers and BiDi-safe UI helpers.
 
@@ -28,7 +28,7 @@ A status bar item shows **RTL UI: فعال/غیرفعال** and opens the settin
 
 ## RTL UI (Workbench) setup
 
-VS Code/Cursor **cannot** officially RTL the whole workbench. This extension ships **scoped** [`assets/rtl-ui.css`](assets/rtl-ui.css) (v2) injected through:
+VS Code **cannot** officially RTL the whole workbench. This extension ships **scoped** [`assets/rtl-ui.css`](assets/rtl-ui.css) (v2) injected through:
 
 - [`be5invis.vscode-custom-css`](https://marketplace.visualstudio.com/items?itemName=be5invis.vscode-custom-css) (install separately; not a hard dependency)
 
@@ -45,12 +45,12 @@ VS Code/Cursor **cannot** officially RTL the whole workbench. This extension shi
 - RTL on layout chrome (sidebar, panel, status bar) — not global `body` flip
 - `unicode-bidi: plaintext` + `direction: auto` on notifications, settings, quick input
 - Editor, terminal, hovers stay **LTR**
-- Best-effort Cursor chat/composer selectors
+- Best-effort AI chat/composer selectors where the host supports Custom CSS
 
 ### Platform limits
 
 - Notification DOM cannot be patched via extension API (CSS only).
-- Chat UI selectors may break between Cursor releases.
+- Chat UI selectors may break between editor releases.
 - **Windows**: Custom CSS may require running the editor as Administrator.
 
 ### Recovery
@@ -73,5 +73,5 @@ Press `F5` with the repo launch config.
 | Issue | Action |
 |-------|--------|
 | Notifications still wrong | Enable Custom CSS + reload; set `rtlFixer.uiMessageDirection` to `rtl` |
-| Chat input order wrong | Enable RTL UI v2 CSS; update Cursor may require selector tweaks in `rtl-ui.css` |
+| Chat input order wrong | Enable RTL UI v2 CSS; editor updates may require selector tweaks in `rtl-ui.css` |
 | Paths inverted in Quick Open | v2 uses `direction: auto` on quick input — reload after CSS update |

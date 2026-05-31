@@ -43,7 +43,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-14b8a6?style=for-the-badge&logo=opensourceinitiative&logoColor=white)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Chrome MV3](https://img.shields.io/badge/Chrome-MV3-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white)](https://developer.chrome.com/docs/extensions/mv3/)
-[![VS Code](https://img.shields.io/badge/VS%20Code-%2F%20Cursor-007ACC?style=for-the-badge&logo=visualstudiocode&logoColor=white)](https://code.visualstudio.com/)
+[![VS Code](https://img.shields.io/badge/VS%20Code-007ACC?style=for-the-badge&logo=visualstudiocode&logoColor=white)](https://code.visualstudio.com/)
 
 <br />
 
@@ -91,7 +91,7 @@ When **RTL** scripts (Persian, Arabic) meet **LTR** text (English, URLs, code) i
 </td>
 <td width="50%" valign="top">
 
-### 💻 VS Code / Cursor
+### 💻 VS Code
 **RTL Text Fixer**
 
 - Fix selection or clipboard

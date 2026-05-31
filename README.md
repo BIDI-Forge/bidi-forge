@@ -15,7 +15,7 @@ Fix mixed Persian (RTL) and English (LTR) text readability issues by automatical
 ## Features
 
 - **Fix mixed RTL/LTR**: inserts invisible bidi markers so text renders in the intended order.
-- **VS Code / Cursor**: fix selected text or clipboard; BiDi-safe notifications; settings webview; status bar; opt-in scoped RTL UI CSS.
+- **VS Code**: fix selected text or clipboard; BiDi-safe notifications; settings webview; status bar; opt-in scoped RTL UI CSS.
 - **Chrome (MV3)**: fixes DOM text nodes with an enable/disable toggle (sync storage).
 - **Core engine**: reusable TypeScript function you can import in other apps.
 
@@ -80,7 +80,7 @@ The core package exports:
 - `stripBidiMarkers`, `detectParagraphDirection`, `normalizeText`
 - `tokenizeText`, `applyBidiMarkers`, `detectLanguage`, `getCharClass`
 
-### VS Code & Cursor
+### VS Code
 
 - **Command**: `RTL Fixer: اصلاح متن انتخاب‌شده`
 - **Command (Clipboard)**: `RTL Fixer: اصلاح متن کلیپ‌بورد`
@@ -90,9 +90,9 @@ The core package exports:
 
 More details: `packages/vscode-extension/README.md`
 
-#### RTL UI (Workbench) for Cursor / VS Code (opt-in)
+#### RTL UI (Workbench) for VS Code (opt-in)
 
-VS Code / Cursor extensions **cannot** officially flip the whole workbench UI to RTL. This repo provides an *opt-in* workflow using the third-party extension `be5invis.vscode-custom-css` (Custom CSS and JS Loader) to inject an RTL stylesheet while keeping the code editor and terminal LTR.
+VS Code extensions **cannot** officially flip the whole workbench UI to RTL. This repo provides an *opt-in* workflow using the third-party extension `be5invis.vscode-custom-css` (Custom CSS and JS Loader) to inject an RTL stylesheet while keeping the code editor and terminal LTR.
 
 High-level steps:
 
@@ -125,7 +125,7 @@ The popup provides an enable/disable toggle using `chrome.storage.sync`.
 ## Examples
 
 - **Mixed text**: `سلام hello دنیا` → `سلام \u200Ehello\u200E دنیا`
-- **Clipboard workflow (Cursor Chat)**: run `RTL Fixer: اصلاح متن کلیپ‌بورد` → paste into chat.
+- **Clipboard workflow (AI chat paste)**: run `RTL Fixer: اصلاح متن کلیپ‌بورد` → paste into chat.
 
 ## Supported languages
 
@@ -137,7 +137,7 @@ The popup provides an enable/disable toggle using `chrome.storage.sync`.
 
 ## Downloads
 
-- **VS Code / Cursor**: build a `.vsix` from `packages/vscode-extension`:
+- **VS Code**: build a `.vsix` from `packages/vscode-extension`:
 
 ```bash
 pnpm -C packages/vscode-extension package
@@ -180,5 +180,5 @@ For open-source projects, the MIT License is a popular choice because it is simp
 
 ## Publishing
 
-- **VS Code / Cursor**: from `packages/vscode-extension` run `pnpm package` to build a `.vsix`.
+- **VS Code**: from `packages/vscode-extension` run `pnpm package` to build a `.vsix`.
 - **Chrome**: run `pnpm -C packages/chrome-extension pack:store` then upload `store/release/rtl-text-fixer-chrome-*.zip` to the [Chrome Web Store Developer Console](https://chrome.google.com/webstore/devconsole). See `packages/chrome-extension/store/UPLOAD_GUIDE.md`.
