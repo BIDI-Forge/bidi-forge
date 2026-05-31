@@ -11,7 +11,7 @@ function setVersionLabel(): void {
   try {
     versionEl.textContent = `v${chrome.runtime.getManifest().version}`;
   } catch {
-    versionEl.textContent = "v0.3.4";
+    versionEl.textContent = "v0.3.5";
   }
 }
 

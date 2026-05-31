@@ -3,7 +3,7 @@
 آیتم شما:  
 https://chrome.google.com/webstore/devconsole/23f05dd1-6711-483f-982f-86caf4058ec8
 
-ZIP آپلود: `store/release/rtl-text-fixer-chrome-0.3.4.zip`  
+ZIP آپلود: `store/release/rtl-text-fixer-chrome-0.3.5.zip`  
 (`pnpm -C packages/chrome-extension pack:store`)
 
 ---
@@ -12,7 +12,7 @@ ZIP آپلود: `store/release/rtl-text-fixer-chrome-0.3.4.zip`
 
 | # | تب | کار |
 |---|-----|-----|
-| 1 | **Build** / Package | آپلود ZIP v0.3.4 |
+| 1 | **Build** / Package | آپلود ZIP v0.3.5 |
 | 2 | **Store listing** | متن + گرافیک (پایین) |
 | 3 | **Privacy** | Single purpose + policy URL |
 | 4 | **Distribution** | Public + مناطق |
@@ -23,9 +23,9 @@ ZIP آپلود: `store/release/rtl-text-fixer-chrome-0.3.4.zip`
 ## ۱ — Build (Package)
 
 1. تب **Package** → **Upload new package**
-2. فایل: `packages/chrome-extension/store/release/rtl-text-fixer-chrome-0.3.4.zip`
+2. فایل: `packages/chrome-extension/store/release/rtl-text-fixer-chrome-0.3.5.zip`
 3. تا وضعیت **Ready** / بدون خطا بمان
-4. نسخه باید **0.3.4** باشد (با manifest یکی)
+4. نسخه باید **0.3.5** باشد (با manifest یکی)
 
 ---
 
@@ -145,7 +145,7 @@ Support: https://github.com/BIDI-Forge/bidi-forge/issues
 
 ## چک‌لیست حرفه‌ای قبل Submit
 
-- [ ] ZIP 0.3.4 آپلود شده
+- [ ] ZIP 0.3.5 آپلود شده
 - [ ] Summary زیر ۱۳۲ کاراکتر
 - [ ] حداقل ۱ اسکرین‌شات **واقعی** (نه فقط placeholder)
 - [ ] Privacy policy روی GitHub live است

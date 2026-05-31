@@ -74,8 +74,14 @@ function applyEnhancedMarkers(
     }
 
     if (t.dir === "NUMBER") {
+      const atLineStart = idx === 0 || !findPrevStrong(tokens, idx);
       const hasRtlNeighbor = inRtlContext && !inLtrContext;
       const hasLtrNeighbor = inLtrContext && !inRtlContext;
+      const leadingInRtlLine =
+        atLineStart && hasRtlNeighbor && paragraphDirection !== "ltr";
+      if (leadingInRtlLine) {
+        return t;
+      }
       if (hasRtlNeighbor && /[0-9]/.test(t.value)) {
         return { ...t, value: wrapLrm(t.value) };
       }

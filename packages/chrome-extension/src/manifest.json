@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "BIDI - Forge",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "description": "Fix mixed Persian, Arabic & English text order on AI chats (Claude, ChatGPT, Gemini, Grok) using Unicode BiDi.",
   "homepage_url": "https://github.com/BIDI-Forge/bidi-forge",
   "author": "amirmkazemi",

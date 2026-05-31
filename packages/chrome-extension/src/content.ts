@@ -1,6 +1,11 @@
 import { fixMixedText, stripBidiMarkers as stripBidiMarkersCore } from "@rtl-text-fixer/core";
 
 import { tryFixMixedBlockCoalesced } from "./blockFix.js";
+import {
+  applyBlockBidiStyles,
+  applyBidiStylesToSubtree,
+  listComposerBlocks,
+} from "./bidiDomStyles.js";
 import { hookShadowRootsInTree, querySelectorAllDeepFrom } from "./domDeep.js";
 import {
   applyCssOnlyBidiOverrides,
@@ -28,6 +33,8 @@ const SKIP_FIX_SELECTOR = "pre,code,script,style";
 const COMPOSER_INPUT_DEBOUNCE_MS = 450;
 const CSS_ONLY_MAINTAIN_DEBOUNCE_MS = 400;
 const COMPOSER_AFTER_ENTER_GRACE_MS = 750;
+/** After Backspace/Delete, defer marker fix so caret is not rewritten mid-delete. */
+const COMPOSER_AFTER_DELETE_GRACE_MS = 650;
 const MUTATION_BATCH_MS = 32;
 const WIRE_EDITABLES_DEBOUNCE_MS = 500;
 const MESSAGE_ROOT_SCAN_MS = 450;
@@ -75,6 +82,43 @@ function findMessageRootForNode(node: Node): HTMLElement | null {
   if (isInsideCssOnlyComposer(root, host)) return null;
   if (root.isContentEditable) return null;
   return root;
+}
+
+function isDeleteInputEvent(ev: Event): boolean {
+  const inputType = (ev as InputEvent).inputType;
+  return typeof inputType === "string" && inputType.startsWith("delete");
+}
+
+function armComposerDeleteGrace(el: Element): void {
+  skipComposerFixUntil.set(el, Date.now() + COMPOSER_AFTER_DELETE_GRACE_MS);
+  const prev = scheduledInputFix.get(el);
+  if (prev !== undefined) window.clearTimeout(prev);
+  const reschedule = composerScheduleByEditable.get(el);
+  if (!reschedule) return;
+  const id = window.setTimeout(() => {
+    scheduledInputFix.delete(el);
+    reschedule();
+  }, COMPOSER_AFTER_DELETE_GRACE_MS);
+  scheduledInputFix.set(el, id);
+}
+
+function wireComposerDeleteGrace(el: Element): void {
+  el.addEventListener(
+    "beforeinput",
+    (ev) => {
+      if (!isDeleteInputEvent(ev)) return;
+      armComposerDeleteGrace(el);
+    },
+    { capture: true },
+  );
+  el.addEventListener(
+    "keydown",
+    (ev) => {
+      if (ev.key !== "Backspace" && ev.key !== "Delete") return;
+      armComposerDeleteGrace(el);
+    },
+    { capture: true },
+  );
 }
 
 function maintainCssOnlyComposerSafe(
@@ -171,9 +215,8 @@ function applyComposerBidiHint(host: HTMLElement): void {
     host instanceof HTMLTextAreaElement || (host instanceof HTMLElement && host.isContentEditable);
   if (!ok || bidiHintsApplied.has(host)) return;
   bidiHintsApplied.add(host);
-  host.setAttribute("dir", "auto");
-  host.style.setProperty("unicode-bidi", "plaintext", "important");
-  host.style.setProperty("direction", "auto", "important");
+  applyBlockBidiStyles(host);
+  if (host.isContentEditable) applyBidiStylesToSubtree(host);
 }
 
 function isLikelyGoogleAiSurface(hostname: string): boolean {
@@ -239,12 +282,14 @@ function fixTextarea(el: HTMLTextAreaElement): void {
   if (!shouldFixText(logical)) return;
 
   const fixed = fixMixedTextSafe(logical);
-  if (fixed === full) return;
+  if (fixed === logical) return;
 
   const start = el.selectionStart ?? 0;
   const end = el.selectionEnd ?? start;
-  const nextStart = mapOriginalOffsetToFixed(full, fixed, start);
-  const nextEnd = mapOriginalOffsetToFixed(full, fixed, end);
+  const logicalStart = stripBidiMarkers(full.slice(0, start)).length;
+  const logicalEnd = stripBidiMarkers(full.slice(0, end)).length;
+  const nextStart = mapOriginalOffsetToFixed(logical, fixed, logicalStart);
+  const nextEnd = mapOriginalOffsetToFixed(logical, fixed, logicalEnd);
 
   el.value = fixed;
   try {
@@ -261,22 +306,13 @@ function getCaretBlock(root: HTMLElement): HTMLElement | null {
   if (!anchor || !root.contains(anchor)) return null;
   const el = closestElement(anchor);
   if (!el) return null;
-  const block = el.closest("p, li, [data-block], div[role='paragraph']");
+  const block = el.closest("p, li, ol, ul, [data-block], div[role='paragraph']");
   if (block instanceof HTMLElement && root.contains(block)) return block;
   return root;
 }
 
-function listComposerBlocks(root: HTMLElement): HTMLElement[] {
-  const blocks: HTMLElement[] = [];
-  for (const p of root.querySelectorAll("p")) {
-    if (p instanceof HTMLElement) blocks.push(p);
-  }
-  if (blocks.length > 0) return blocks;
-  for (const child of root.children) {
-    if (child instanceof HTMLElement && child.tagName === "DIV") blocks.push(child);
-  }
-  if (blocks.length === 0) blocks.push(root);
-  return blocks;
+function listComposerBlocksFromRoot(root: HTMLElement): HTMLElement[] {
+  return listComposerBlocks(root);
 }
 
 function fixContentEditableRoot(root: HTMLElement, mode: "typing" | "full" = "typing"): boolean {
@@ -298,7 +334,7 @@ function fixContentEditableRoot(root: HTMLElement, mode: "typing" | "full" = "ty
           const caret = getCaretBlock(root);
           return caret ? [caret] : [];
         })()
-      : listComposerBlocks(root);
+      : listComposerBlocksFromRoot(root);
 
   let changed = false;
   for (const block of blocks) {
@@ -550,6 +586,7 @@ function wireCssOnlyComposerEditable(el: Element): void {
   };
 
   composerScheduleByEditable.set(el, scheduleMaintain);
+  wireComposerDeleteGrace(el);
 
   el.addEventListener("compositionstart", () => composing.set(el, true), { passive: true });
   el.addEventListener("compositionend", () => {
@@ -642,6 +679,7 @@ function ensureEditableWired(el: Element): void {
   };
 
   composerScheduleByEditable.set(el, schedule);
+  wireComposerDeleteGrace(el);
 
   el.addEventListener("compositionstart", () => composing.set(el, true), { passive: true });
   el.addEventListener("compositionend", () => {

@@ -2,7 +2,7 @@
 
 Manifest V3 extension that improves mixed Persian/Arabic + English readability by inserting Unicode bidi marks (LRM/RLM) into DOM text and editable fields.
 
-**Current version:** `0.3.4` (see `src/manifest.json`).
+**Current version:** `0.3.5` (see `src/manifest.json`).
 
 ## Install
 
@@ -31,7 +31,7 @@ pnpm -C packages/chrome-extension pack:store
 
 | Output | Path |
 |--------|------|
-| Upload ZIP | `store/release/rtl-text-fixer-chrome-0.3.4.zip` |
+| Upload ZIP | `store/release/rtl-text-fixer-chrome-0.3.5.zip` |
 | Store icon 128×128 | `store/promo/icon-128.png` |
 | Screenshot 1280×800 | `store/screenshots/screenshot-1280x800.png` |
 | Listing copy (EN) | `store/LISTING.md` |

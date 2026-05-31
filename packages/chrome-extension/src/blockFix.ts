@@ -4,7 +4,10 @@ import { isInsideCssOnlyComposer } from "./cssOnlyComposer.js";
 
 const PERSIAN_RE = /[\u0600-\u06FF]/;
 const ENGLISH_RE = /[a-zA-Z]/;
-const BIDI_MARKER_RE = /[\u200E\u200F\u2066-\u2069]/;
+
+function isMarkerChar(ch: string): boolean {
+  return /[\u200E\u200F\u2066-\u2069]/.test(ch);
+}
 
 export function shouldFixMixedText(text: string): boolean {
   return PERSIAN_RE.test(text) && ENGLISH_RE.test(text);
@@ -31,7 +34,18 @@ export function fixBlockCoalescedTextNodes(block: HTMLElement, fixed: string): b
   return true;
 }
 
-/** Non-destructive block fix (no execCommand) for live composers. */
+/** Map logical (marker-free) offset to DOM offset inside one text node. */
+export function mapLogicalOffsetToDomOffset(textWithMarkers: string, logicalOffset: number): number {
+  const target = Math.max(0, logicalOffset);
+  let logical = 0;
+  for (let i = 0; i < textWithMarkers.length; i++) {
+    if (logical >= target) return i;
+    if (!isMarkerChar(textWithMarkers[i]!)) logical++;
+  }
+  return textWithMarkers.length;
+}
+
+/** Map logical offset in marker-free text to DOM offset in marker-inclusive fixed text. */
 export function mapOffsetThroughMarkerFix(
   original: string,
   fixed: string,
@@ -43,7 +57,7 @@ export function mapOffsetThroughMarkerFix(
 
   while (i < fixed.length && j < target) {
     const fc = fixed[i]!;
-    if (BIDI_MARKER_RE.test(fc)) {
+    if (isMarkerChar(fc)) {
       i++;
       continue;
     }
@@ -56,26 +70,62 @@ export function mapOffsetThroughMarkerFix(
     i++;
   }
 
-  while (i < fixed.length && BIDI_MARKER_RE.test(fixed[i]!)) i++;
+  while (i < fixed.length && isMarkerChar(fixed[i]!)) i++;
   return i;
 }
 
-export function getCaretOffsetInBlock(block: HTMLElement): number | null {
+/** Caret offset in DOM text order (includes bidi markers). Avoids `Range.toString()` visual reordering. */
+export function getCaretDomOffsetInBlock(block: HTMLElement): number | null {
   const sel = block.ownerDocument.getSelection?.();
   if (!sel || sel.rangeCount === 0) return null;
   const range = sel.getRangeAt(0);
   if (!block.contains(range.startContainer) || !range.collapsed) return null;
 
-  const pre = block.ownerDocument.createRange();
-  pre.selectNodeContents(block);
-  pre.setEnd(range.startContainer, range.startOffset);
-  return pre.toString().length;
+  const walker = block.ownerDocument.createTreeWalker(block, NodeFilter.SHOW_TEXT);
+  let dom = 0;
+  let n: Node | null;
+  while ((n = walker.nextNode())) {
+    const t = n as Text;
+    const v = t.nodeValue ?? "";
+    if (range.startContainer === t) {
+      return dom + range.startOffset;
+    }
+    dom += v.length;
+  }
+  return null;
 }
 
-export function setCaretOffsetInBlock(block: HTMLElement, offset: number): void {
+/** Caret offset in logical marker-free text (stable for mixed RTL/LTR). */
+export function getCaretLogicalOffsetInBlock(block: HTMLElement): number | null {
+  const sel = block.ownerDocument.getSelection?.();
+  if (!sel || sel.rangeCount === 0) return null;
+  const range = sel.getRangeAt(0);
+  if (!block.contains(range.startContainer) || !range.collapsed) return null;
+
+  const walker = block.ownerDocument.createTreeWalker(block, NodeFilter.SHOW_TEXT);
+  let logical = 0;
+  let n: Node | null;
+  while ((n = walker.nextNode())) {
+    const t = n as Text;
+    const v = t.nodeValue ?? "";
+    if (range.startContainer === t) {
+      logical += stripBidiMarkers(v.slice(0, range.startOffset)).length;
+      return logical;
+    }
+    logical += stripBidiMarkers(v).length;
+  }
+  return null;
+}
+
+/** @deprecated Prefer getCaretDomOffsetInBlock or getCaretLogicalOffsetInBlock. */
+export function getCaretOffsetInBlock(block: HTMLElement): number | null {
+  return getCaretDomOffsetInBlock(block);
+}
+
+export function setCaretDomOffsetInBlock(block: HTMLElement, domOffset: number): void {
   const doc = block.ownerDocument;
   const walker = doc.createTreeWalker(block, NodeFilter.SHOW_TEXT);
-  let remaining = Math.max(0, offset);
+  let remaining = Math.max(0, domOffset);
   let n: Node | null;
   while ((n = walker.nextNode())) {
     const t = n as Text;
@@ -94,31 +144,45 @@ export function setCaretOffsetInBlock(block: HTMLElement, offset: number): void 
   }
 }
 
-/** Last strong character before caret (logical DOM order in range). */
-export function lastStrongBeforeCaret(block: HTMLElement): "ltr" | "rtl" | null {
-  const sel = block.ownerDocument.getSelection?.();
-  if (!sel || sel.rangeCount === 0) return null;
-  const range = sel.getRangeAt(0);
-  if (!block.contains(range.startContainer)) return null;
-
-  const pre = block.ownerDocument.createRange();
-  pre.selectNodeContents(block);
-  pre.setEnd(range.startContainer, range.startOffset);
-  const text = stripBidiMarkers(pre.toString());
-
-  for (let i = text.length - 1; i >= 0; i--) {
-    const ch = text[i]!;
-    if (/\s/.test(ch)) continue;
-    if (ENGLISH_RE.test(ch) || /[0-9]/.test(ch)) return "ltr";
-    if (PERSIAN_RE.test(ch)) return "rtl";
-    return null;
+/** Restore caret using logical (marker-free) offset. */
+export function setCaretLogicalOffsetInBlock(block: HTMLElement, logicalOffset: number): void {
+  const doc = block.ownerDocument;
+  const walker = doc.createTreeWalker(block, NodeFilter.SHOW_TEXT);
+  let remaining = Math.max(0, logicalOffset);
+  let n: Node | null;
+  while ((n = walker.nextNode())) {
+    const t = n as Text;
+    const v = t.nodeValue ?? "";
+    const logicalLen = stripBidiMarkers(v).length;
+    if (remaining <= logicalLen) {
+      const domOffset = mapLogicalOffsetToDomOffset(v, remaining);
+      const sel = doc.getSelection?.();
+      if (!sel) return;
+      const r = doc.createRange();
+      r.setStart(t, domOffset);
+      r.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(r);
+      return;
+    }
+    remaining -= logicalLen;
   }
-  return null;
 }
 
-/** Caret boundary using `textContent` (stable in Quill); avoids mixed-bidi `Range.toString()` drift. */
-export function lastStrongBeforeCaretLogical(block: HTMLElement): "ltr" | "rtl" | null {
-  const offset = getCaretOffsetInBlock(block);
+/** @deprecated Prefer setCaretDomOffsetInBlock or setCaretLogicalOffsetInBlock. */
+export function setCaretOffsetInBlock(block: HTMLElement, offset: number): void {
+  setCaretDomOffsetInBlock(block, offset);
+}
+
+function isBlockFocused(block: HTMLElement): boolean {
+  const doc = block.ownerDocument;
+  const active = doc.activeElement;
+  return active === block || (active instanceof Node && block.contains(active));
+}
+
+/** Last strong character before caret (logical order). */
+export function lastStrongBeforeCaret(block: HTMLElement): "ltr" | "rtl" | null {
+  const offset = getCaretLogicalOffsetInBlock(block);
   if (offset === null) return null;
   const before = stripBidiMarkers(block.textContent ?? "").slice(0, offset);
   for (let i = before.length - 1; i >= 0; i--) {
@@ -129,6 +193,11 @@ export function lastStrongBeforeCaretLogical(block: HTMLElement): "ltr" | "rtl" 
     return null;
   }
   return null;
+}
+
+/** @deprecated Use lastStrongBeforeCaret — now logical. */
+export function lastStrongBeforeCaretLogical(block: HTMLElement): "ltr" | "rtl" | null {
+  return lastStrongBeforeCaret(block);
 }
 
 export function tryFixMixedBlockCoalesced(block: HTMLElement): boolean {
@@ -145,10 +214,21 @@ export function tryFixMixedBlockCoalesced(block: HTMLElement): boolean {
   const fixed = fixMixedText(raw);
   if (fixed === raw) return false;
 
+  const focused = isBlockFocused(block);
+  const logicalCaret = focused ? getCaretLogicalOffsetInBlock(block) : null;
+
+  let changed = false;
   if (block.childElementCount === 0) {
     block.textContent = fixed;
-    return true;
+    changed = true;
+  } else {
+    changed = fixBlockCoalescedTextNodes(block, fixed);
   }
 
-  return fixBlockCoalescedTextNodes(block, fixed);
+  if (changed && focused && logicalCaret !== null) {
+    const domCaret = mapOffsetThroughMarkerFix(raw, fixed, logicalCaret);
+    setCaretDomOffsetInBlock(block, domCaret);
+  }
+
+  return changed;
 }

@@ -10,7 +10,7 @@ Fix mixed Persian (RTL) and English (LTR) text readability issues by automatical
 
 - **License**: MIT
 - **Version (VS Code extension)**: 0.2.0
-- **Version (Chrome extension)**: 0.3.4
+- **Version (Chrome extension)**: 0.3.5
 - **Chrome Web Store**: [BIDI - Forge](https://chromewebstore.google.com/detail/ffngaifiipbklkbobombbgaeokinepdc)
 - **Stack**: TypeScript + pnpm (workspace) + Node.js 18+
 

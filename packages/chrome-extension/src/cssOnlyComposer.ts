@@ -5,7 +5,14 @@
 
 import { stripBidiMarkers } from "@rtl-text-fixer/core";
 
-import { getCaretOffsetInBlock, setCaretOffsetInBlock } from "./blockFix.js";
+import {
+  applyBlockBidiStyles,
+  applyListContainerBidiStyles,
+  applyListItemBidiStyles,
+  BIDI_COMPOSER_BLOCK_SELECTOR,
+  BIDI_LIST_SELECTOR,
+} from "./bidiDomStyles.js";
+import { getCaretLogicalOffsetInBlock, setCaretLogicalOffsetInBlock } from "./blockFix.js";
 
 const BIDI_MARKER_RE = /[\u200E\u200F\u2066-\u2069]/;
 
@@ -82,11 +89,17 @@ export function isChatGptHost(hostname: string): boolean {
   );
 }
 
+export function isClaudeLikeHost(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+  return h === "claude.ai" || h.endsWith(".claude.ai") || h.includes("anthropic.com");
+}
+
 export function isCssOnlySurface(hostname: string, pathname = ""): boolean {
   return (
     isGeminiHost(hostname) ||
     isGrokSurface(hostname, pathname) ||
-    isChatGptHost(hostname)
+    isChatGptHost(hostname) ||
+    isClaudeLikeHost(hostname)
   );
 }
 
@@ -236,20 +249,78 @@ export function isChatGptLiveComposer(hostname: string, el: Element): boolean {
   return editor === el || editor.contains(el);
 }
 
+// ── Claude (ProseMirror) ────────────────────────────────────────────────────
+
+const CLAUDE_MESSAGE_BUBBLE_SELECTOR =
+  '[data-testid="assistant-message"], [data-testid="user-message"]';
+
+const CLAUDE_COMPOSER_SHELL_SELECTOR =
+  'form, footer, [class*="composer"], [class*="Composer"], [data-testid*="composer"]';
+
+function isInsideClaudeMessageBubble(el: Element): boolean {
+  return Boolean(el.closest(CLAUDE_MESSAGE_BUBBLE_SELECTOR));
+}
+
+function resolveClaudeEditor(hostname: string, anchor: Element): HTMLElement | null {
+  if (!isClaudeLikeHost(hostname)) return null;
+
+  for (const sel of [
+    '.ProseMirror[contenteditable="true"]',
+    '.ProseMirror[contenteditable=""]',
+    '[contenteditable="true"][role="textbox"]',
+  ]) {
+    const found = anchor.closest(sel);
+    if (
+      found instanceof HTMLElement &&
+      found.isContentEditable &&
+      !isInsideClaudeMessageBubble(found)
+    ) {
+      return found;
+    }
+  }
+
+  const shell = anchor.closest(CLAUDE_COMPOSER_SHELL_SELECTOR);
+  if (shell) {
+    const ce = shell.querySelector('.ProseMirror[contenteditable="true"], [contenteditable="true"][role="textbox"]');
+    if (ce instanceof HTMLElement && ce.isContentEditable && !isInsideClaudeMessageBubble(ce)) {
+      return ce;
+    }
+    const ta = shell.querySelector("textarea:not([disabled])");
+    if (ta instanceof HTMLTextAreaElement && !isInsideClaudeMessageBubble(ta)) {
+      return ta;
+    }
+  }
+
+  if (anchor instanceof HTMLTextAreaElement && !isInsideClaudeMessageBubble(anchor)) {
+    return anchor;
+  }
+
+  return null;
+}
+
+export function isClaudeLiveComposer(hostname: string, el: Element): boolean {
+  if (!isClaudeLikeHost(hostname)) return false;
+  const editor = resolveClaudeEditor(hostname, el);
+  if (!editor) return false;
+  return editor === el || editor.contains(el);
+}
+
 // ── Unified ───────────────────────────────────────────────────────────────────
 
 export function resolveCssOnlyEditor(hostname: string, anchor: Element): HTMLElement | null {
   return (
     findGeminiQuillEditor(anchor) ??
     resolveGrokEditor(hostname, anchor) ??
-    resolveChatGptEditor(hostname, anchor)
+    resolveChatGptEditor(hostname, anchor) ??
+    resolveClaudeEditor(hostname, anchor)
   );
 }
 
 export function isCssOnlyComposer(hostname: string, el: Element): boolean {
   if (isGeminiQuillComposer(hostname, el)) return true;
   if (isGrokLiveComposer(hostname, el)) return true;
-  return isChatGptLiveComposer(hostname, el);
+  if (isChatGptLiveComposer(hostname, el)) return true;
+  return isClaudeLiveComposer(hostname, el);
 }
 
 export function isInsideCssOnlyComposer(el: Element, hostname: string): boolean {
@@ -271,36 +342,20 @@ function getCaretBlockInEditor(editor: HTMLElement): HTMLElement | null {
       ? (anchor as Element)
       : (anchor.parentElement ?? null);
   if (!el) return null;
-  const block = el.closest("p");
+  const block = el.closest("p, li");
   if (block instanceof HTMLElement && editor.contains(block)) return block;
   return editor;
-}
-
-function prefixTextAtOffset(block: HTMLElement, offset: number): string {
-  const walker = block.ownerDocument.createTreeWalker(block, NodeFilter.SHOW_TEXT);
-  let remaining = Math.max(0, offset);
-  let acc = "";
-  let n: Node | null;
-  while ((n = walker.nextNode())) {
-    const v = (n as Text).nodeValue ?? "";
-    if (remaining <= v.length) {
-      acc += v.slice(0, remaining);
-      break;
-    }
-    acc += v;
-    remaining -= v.length;
-  }
-  return acc;
 }
 
 const geminiDirObservers = new WeakMap<HTMLElement, MutationObserver>();
 const cssOnlyEditorHinted = new WeakSet<HTMLElement>();
 
 function syncBlockBidiStyles(block: HTMLElement): void {
-  block.setAttribute("dir", "auto");
   block.classList.remove("ql-direction-rtl", "ql-direction-ltr");
-  block.style.setProperty("unicode-bidi", "plaintext", "important");
-  block.style.setProperty("text-align", "start", "important");
+  if (block.tagName === "LI") applyListItemBidiStyles(block);
+  else applyBlockBidiStyles(block);
+  const list = block.closest(BIDI_LIST_SELECTOR);
+  if (list instanceof HTMLElement) applyListContainerBidiStyles(list);
 }
 
 function ensureCssOnlyEditorStyles(editor: HTMLElement, scope: "caret" | "all", caretBlock?: HTMLElement): void {
@@ -316,7 +371,10 @@ function ensureCssOnlyEditorStyles(editor: HTMLElement, scope: "caret" | "all", 
 
   const blocks: HTMLElement[] =
     scope === "all"
-      ? Array.from(editor.querySelectorAll("p")).filter((p): p is HTMLElement => p instanceof HTMLElement)
+      ? [
+          ...Array.from(editor.querySelectorAll(BIDI_COMPOSER_BLOCK_SELECTOR)),
+          ...Array.from(editor.querySelectorAll(BIDI_LIST_SELECTOR)),
+        ].filter((el): el is HTMLElement => el instanceof HTMLElement)
       : caretBlock
         ? [caretBlock]
         : [];
@@ -324,6 +382,10 @@ function ensureCssOnlyEditorStyles(editor: HTMLElement, scope: "caret" | "all", 
   if (blocks.length === 0 && editor.isContentEditable) blocks.push(editor);
 
   for (const block of blocks) {
+    if (block.tagName === "OL" || block.tagName === "UL") {
+      applyListContainerBidiStyles(block);
+      continue;
+    }
     syncBlockBidiStyles(block);
   }
 }
@@ -357,9 +419,7 @@ export function applyGeminiQuillBidiOverrides(anchor: HTMLElement): void {
 }
 
 function applyBidiStyles(el: HTMLElement, proseMirrorEditor = false): void {
-  el.setAttribute("dir", "auto");
-  el.style.setProperty("unicode-bidi", "plaintext", "important");
-  el.style.setProperty("text-align", "start", "important");
+  applyBlockBidiStyles(el);
   if (proseMirrorEditor) {
     el.style.removeProperty("direction");
   }
@@ -427,9 +487,7 @@ export function maintainCssOnlyComposer(
   }
 
   const block = getCaretBlockInEditor(editor) ?? editor;
-  const caretDom = getCaretOffsetInBlock(block);
-  const logicalCaret =
-    caretDom !== null ? stripBidiMarkers(prefixTextAtOffset(block, caretDom)).length : null;
+  const logicalCaret = getCaretLogicalOffsetInBlock(block);
 
   ensureCssOnlyEditorStyles(editor, scope, scope === "all" ? undefined : block);
 
@@ -442,7 +500,7 @@ export function maintainCssOnlyComposer(
     editor.contains(editor.ownerDocument.activeElement);
 
   if (focused && logicalCaret !== null) {
-    setCaretOffsetInBlock(block, logicalCaret);
+    setCaretLogicalOffsetInBlock(block, logicalCaret);
   }
 }
 

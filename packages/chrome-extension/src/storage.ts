@@ -23,7 +23,7 @@ export interface ExtensionRuntimeState {
   site: SiteScopeSettings;
 }
 
-function parseScopeMode(raw: unknown): SiteScopeMode {
+function parseScopeMode(): SiteScopeMode {
   return "all";
 }
 

@@ -4,7 +4,10 @@ import {
   formatUiText,
   stripBidiMarkers,
   detectParagraphDirection,
+  detectFirstStrongDirection,
+  needsLeadingRlmForRtlParagraph,
   LRM,
+  RLM,
   LRI,
   PDI,
 } from "../index.js";
@@ -56,6 +59,23 @@ describe("fixMixedText", () => {
   it("preserves legacy mode output", () => {
     const input = "سلام hello دنیا";
     expect(fixMixedText(input, { mode: "legacy" })).toBe(`سلام ${LRM}hello${LRM} دنیا`);
+  });
+
+  it("prepends RLM when RTL text follows emoji or list numbers", () => {
+    const listLine = "1. سلام hello";
+    expect(detectFirstStrongDirection(listLine)).toBe("rtl");
+    expect(needsLeadingRlmForRtlParagraph(listLine, detectParagraphDirection(listLine))).toBe(true);
+    expect(fixMixedText(listLine).startsWith(RLM)).toBe(true);
+
+    const emojiLine = "😀 سلام hello";
+    expect(detectFirstStrongDirection(emojiLine)).toBe("rtl");
+    expect(needsLeadingRlmForRtlParagraph(emojiLine, detectParagraphDirection(emojiLine))).toBe(true);
+    expect(fixMixedText(emojiLine).startsWith(RLM)).toBe(true);
+  });
+
+  it("does not prepend RLM for English-first mixed lines", () => {
+    const output = fixMixedText("hello سلام");
+    expect(output.startsWith(RLM)).toBe(false);
   });
 });
 

@@ -6,13 +6,26 @@
 import { fixMixedText, stripBidiMarkers } from "@rtl-text-fixer/core";
 
 import { fixBlockCoalescedTextNodes, shouldFixMixedText } from "./blockFix.js";
+import {
+  applyBlockBidiStyles,
+  applyListContainerBidiStyles,
+  applyListItemBidiStyles,
+  BIDI_BLOCK_SELECTOR,
+  BIDI_LIST_SELECTOR,
+} from "./bidiDomStyles.js";
 import { querySelectorAllDeepFrom } from "./domDeep.js";
-import { isChatGptHost, isGeminiHost, isGrokSurface, isInsideCssOnlyComposer } from "./cssOnlyComposer.js";
+import {
+  isChatGptHost,
+  isClaudeLikeHost,
+  isGeminiHost,
+  isGrokSurface,
+  isInsideCssOnlyComposer,
+} from "./cssOnlyComposer.js";
 
 const EDITABLE_SELECTOR =
   '[contenteditable="true"],textarea,[role="textbox"][contenteditable="true"]';
 
-const MESSAGE_BLOCK_SELECTOR = "p, li, blockquote, h1, h2, h3, h4, h5, h6";
+const MESSAGE_BLOCK_SELECTOR = BIDI_BLOCK_SELECTOR;
 
 const CLAUDE_MESSAGE_ROOTS = [
   '[data-testid="assistant-message"]',
@@ -45,12 +58,7 @@ const GEMINI_MESSAGE_ROOTS = [
 const hintedRoots = new WeakSet<HTMLElement>();
 const lastRootSignature = new WeakMap<HTMLElement, string>();
 
-export function isClaudeLikeHost(hostname: string): boolean {
-  const h = hostname.toLowerCase();
-  return h === "claude.ai" || h.endsWith(".claude.ai") || h.includes("anthropic.com");
-}
-
-export { isChatGptHost } from "./cssOnlyComposer.js";
+export { isChatGptHost, isClaudeLikeHost } from "./cssOnlyComposer.js";
 
 export function getMessageRootSelectors(hostname: string, pathname = ""): string[] {
   if (isGeminiHost(hostname)) return GEMINI_MESSAGE_ROOTS;
@@ -73,19 +81,13 @@ function isInsideEditable(el: Element): boolean {
 }
 
 function applyReaderBidiStack(root: HTMLElement): void {
-  root.setAttribute("dir", "auto");
-  root.style.setProperty("unicode-bidi", "plaintext", "important");
-  root.style.setProperty("direction", "auto", "important");
-  root.style.setProperty("text-align", "start", "important");
+  applyBlockBidiStyles(root);
 
-  for (const el of root.querySelectorAll(
-    `${MESSAGE_BLOCK_SELECTOR}, ol, ul, table, .markdown, .prose`,
-  )) {
+  for (const el of root.querySelectorAll(`${MESSAGE_BLOCK_SELECTOR}, ${BIDI_LIST_SELECTOR}, table, .markdown, .prose`)) {
     if (!(el instanceof HTMLElement)) continue;
-    el.setAttribute("dir", "auto");
-    el.style.setProperty("unicode-bidi", "plaintext", "important");
-    el.style.setProperty("direction", "auto", "important");
-    el.style.setProperty("text-align", "start", "important");
+    if (el.tagName === "OL" || el.tagName === "UL") applyListContainerBidiStyles(el);
+    else if (el.tagName === "LI") applyListItemBidiStyles(el);
+    else applyBlockBidiStyles(el);
   }
 
   for (const code of root.querySelectorAll("pre, code")) {
@@ -142,7 +144,7 @@ export function scanMessageRoot(root: HTMLElement, hostname: string): void {
   const signature = stripBidiMarkers(root.textContent ?? "");
   if (lastRootSignature.get(root) === signature) return;
 
-  for (const block of root.querySelectorAll(MESSAGE_BLOCK_SELECTOR)) {
+  for (const block of root.querySelectorAll(`${MESSAGE_BLOCK_SELECTOR}, li > p`)) {
     if (!(block instanceof HTMLElement)) continue;
     if (isInsideEditable(block)) continue;
     if (isInsideCssOnlyComposer(block, hostname)) continue;
