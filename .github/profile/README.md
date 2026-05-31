@@ -258,6 +258,26 @@ pnpm test
 
 ---
 
+## ✦ Support the project
+
+<div align="center">
+
+BIDI · Forge is free and open source. If it helps your AI chats or mixed RTL/LTR workflow, you can buy us a coffee on CoffeeBede ☕
+
+<br /><br />
+
+<a href="https://www.coffeebede.com/bidi-forge">
+  <img src="https://coffeebede.ir/DashboardTemplateV2/app-assets/images/banner/default-yellow.svg" alt="Buy us a coffee on CoffeeBede" width="320" />
+</a>
+
+<br /><br />
+
+**[coffeebede.com/bidi-forge](https://www.coffeebede.com/bidi-forge)**
+
+</div>
+
+---
+
 ## ✦ Powered by
 
 <div align="center">
