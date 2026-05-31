@@ -12,6 +12,7 @@ Fix mixed Persian (RTL) and English (LTR) text readability issues by automatical
 - **Version (VS Code extension)**: 0.2.0
 - **Version (Chrome extension)**: 0.3.4
 - **Chrome Web Store**: [BIDI - Forge](https://chromewebstore.google.com/detail/ffngaifiipbklkbobombbgaeokinepdc)
+- **Support**: [CoffeeBede — buy us a coffee ☕](https://www.coffeebede.com/bidi-forge)
 - **Stack**: TypeScript + pnpm (workspace) + Node.js 18+
 
 ## Features
@@ -181,6 +182,18 @@ For open-source projects, the MIT License is a popular choice because it is simp
 
 - Unicode bidirectional marks: LRM/RLM
 - Opt-in workbench RTL approach powered by `be5invis.vscode-custom-css`
+
+## Support
+
+BIDI · Forge is free and open source. If it saves you time in AI chats or mixed RTL/LTR writing, you can support development on CoffeeBede:
+
+<p align="center">
+  <a href="https://www.coffeebede.com/bidi-forge">
+    <img src="https://coffeebede.ir/DashboardTemplateV2/app-assets/images/banner/default-yellow.svg" alt="Buy us a coffee on CoffeeBede" width="320" />
+  </a>
+</p>
+
+**Link:** https://www.coffeebede.com/bidi-forge
 
 ## Publishing
 
