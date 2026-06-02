@@ -4,13 +4,15 @@ Fix mixed Persian (RTL) and English (LTR) text readability using Unicode bidirec
 
 ## Commands
 
-| Command | ID | Description |
-|---------|-----|-------------|
-| اصلاح متن انتخاب‌شده | `rtlFixer.fixSelectedText` | Fix selected editor text |
-| اصلاح متن کلیپ‌بورد | `rtlFixer.fixClipboardText` | Fix clipboard (paste into chat) |
-| تنظیمات و راهنما | `rtlFixer.openSettings` | BiDi-safe settings/help webview |
-| فعال‌سازی RTL UI | `rtlFixer.enableRtlUi` | Inject scoped `rtl-ui.css` via Custom CSS |
-| غیرفعال‌سازی RTL UI | `rtlFixer.disableRtlUi` | Remove CSS import |
+Command titles follow your VS Code display language (`package.nls.json` / `package.nls.fa.json`).
+
+| English title | ID | Description |
+|---------------|-----|-------------|
+| Fix selected text | `rtlFixer.fixSelectedText` | Fix selected editor text |
+| Fix clipboard text | `rtlFixer.fixClipboardText` | Fix clipboard (paste into chat) |
+| Settings and guide | `rtlFixer.openSettings` | BiDi-safe settings/help webview |
+| Enable RTL UI (Custom CSS) | `rtlFixer.enableRtlUi` | Inject scoped `rtl-ui.css` via Custom CSS |
+| Disable RTL UI (Custom CSS) | `rtlFixer.disableRtlUi` | Remove CSS import |
 
 ## Keybindings (default)
 
@@ -45,7 +47,7 @@ VS Code **cannot** officially RTL the whole workbench. This extension ships **sc
 - RTL on layout chrome (sidebar, panel, status bar) — not global `body` flip
 - `unicode-bidi: plaintext` + `direction: auto` on notifications, settings, quick input
 - Editor, terminal, hovers stay **LTR**
-- Best-effort AI chat/composer selectors where the host supports Custom CSS
+- Best-effort VS Code chat, Cursor Agent, and Composer selectors (see `rtl-ui.css`); tested on VS Code **1.90+** / recent Cursor builds
 
 ### Platform limits
 
@@ -69,6 +71,8 @@ pnpm -C packages/vscode-extension test
 Press `F5` with the repo launch config.
 
 ## Troubleshooting
+
+See **[TROUBLESHOOTING-RTL-UI.md](TROUBLESHOOTING-RTL-UI.md)** for a full Custom CSS checklist (import path, Windows admin, recovery).
 
 | Issue | Action |
 |-------|--------|

@@ -1,0 +1,10 @@
+{
+  "rtlFixer.configuration.title": "RTL Text Fixer",
+  "rtlFixer.uiMessageDirection.description": "جهت پایه برای پیام‌های اعلان افزونه.",
+  "rtlFixer.fixOnPaste.description": "اصلاح خودکار متن دوزبانه هنگام چسباندن در ویرایشگر.",
+  "rtlFixer.fixSelectedText.title": "RTL Fixer: اصلاح متن انتخاب‌شده",
+  "rtlFixer.fixClipboardText.title": "RTL Fixer: اصلاح متن کلیپ‌بورد",
+  "rtlFixer.enableRtlUi.title": "RTL Fixer: فعال‌سازی RTL برای UI (با Custom CSS)",
+  "rtlFixer.disableRtlUi.title": "RTL Fixer: غیرفعال‌سازی RTL برای UI (با Custom CSS)",
+  "rtlFixer.openSettings.title": "RTL Fixer: تنظیمات و راهنما"
+}

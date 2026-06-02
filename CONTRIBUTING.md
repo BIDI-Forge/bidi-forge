@@ -30,7 +30,10 @@ pnpm dev
 pnpm test
 pnpm lint
 pnpm format
+pnpm smoke:vsix   # build VS Code VSIX and verify manifest + rtl-ui.css
 ```
+
+VS Code **RTL UI (Custom CSS)** troubleshooting: [packages/vscode-extension/TROUBLESHOOTING-RTL-UI.md](packages/vscode-extension/TROUBLESHOOTING-RTL-UI.md).
 
 ## Reporting bugs
 

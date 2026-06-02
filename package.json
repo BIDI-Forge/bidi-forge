@@ -10,7 +10,8 @@
     "lint": "pnpm -r lint",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
-    "test:e2e": "pnpm -C packages/chrome-extension test:e2e"
+    "test:e2e": "pnpm -C packages/chrome-extension test:e2e",
+    "smoke:vsix": "node scripts/smoke-vsix.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.19.0",
