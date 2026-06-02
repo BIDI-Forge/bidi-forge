@@ -1,15 +1,21 @@
-import { getEnabled, setEnabled } from "./storage.js";
+import { syncAllSitesContentScript } from "./contentScriptManager.js";
+import { getEnabled, getSiteScopeSettings, setEnabled } from "./storage.js";
 
-type Message = { type: "GET_ENABLED" } | { type: "SET_ENABLED"; enabled: boolean };
+type Message =
+  | { type: "GET_ENABLED" }
+  | { type: "SET_ENABLED"; enabled: boolean };
+
 const STORAGE_KEY_ENABLED = "rtlTextFixerEnabled";
 const STORAGE_KEY_SITE_SCOPE = "rtlTextFixerSiteScope";
 
-chrome.runtime.onInstalled.addListener(() => {
-  void new Promise<void>((resolve) => {
+async function ensureDefaultSettings(): Promise<void> {
+  await new Promise<void>((resolve) => {
     chrome.storage.sync.get([STORAGE_KEY_ENABLED, STORAGE_KEY_SITE_SCOPE], (result) => {
       const next: Record<string, unknown> = {};
       if (typeof result[STORAGE_KEY_ENABLED] === "undefined") next[STORAGE_KEY_ENABLED] = true;
-      if (typeof result[STORAGE_KEY_SITE_SCOPE] === "undefined") next[STORAGE_KEY_SITE_SCOPE] = "all";
+      if (typeof result[STORAGE_KEY_SITE_SCOPE] === "undefined") {
+        next[STORAGE_KEY_SITE_SCOPE] = "presets";
+      }
       if (Object.keys(next).length > 0) {
         chrome.storage.sync.set(next, () => resolve());
         return;
@@ -17,6 +23,26 @@ chrome.runtime.onInstalled.addListener(() => {
       resolve();
     });
   });
+}
+
+async function syncRuntime(): Promise<void> {
+  const site = await getSiteScopeSettings();
+  await syncAllSitesContentScript(site.mode);
+}
+
+chrome.runtime.onInstalled.addListener(() => {
+  void ensureDefaultSettings().then(syncRuntime);
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  void syncRuntime();
+});
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName !== "sync") return;
+  if (changes[STORAGE_KEY_SITE_SCOPE]) {
+    void syncRuntime();
+  }
 });
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {

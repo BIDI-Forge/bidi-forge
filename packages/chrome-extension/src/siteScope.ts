@@ -23,6 +23,7 @@ export const BUILTIN_PRESET_HOSTS: readonly string[] = [
   "copilot.microsoft.com",
   "perplexity.ai",
   "deepseek.com",
+  "chat.deepseek.com",
   "x.com",
   "twitter.com",
   "x.ai",

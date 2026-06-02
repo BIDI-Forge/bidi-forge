@@ -42,4 +42,6 @@ Thumbs.db
 *.vsix
 *.log
 coverage/
+test-results/
+playwright-report/
 

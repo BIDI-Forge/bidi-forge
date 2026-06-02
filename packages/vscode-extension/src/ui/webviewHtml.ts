@@ -1,4 +1,4 @@
-import { fixMixedText, formatUiText } from "@rtl-text-fixer/core";
+import { fixMixedText, formatUiText } from "@bidi-forge/core";
 
 export interface SettingsWebviewOptions {
   cssUri: string;

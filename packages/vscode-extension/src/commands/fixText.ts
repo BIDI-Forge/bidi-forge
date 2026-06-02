@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { fixMixedText } from "@rtl-text-fixer/core";
+import { fixMixedText } from "@bidi-forge/core";
 import { showBiDiInformationMessage } from "../ui/messages.js";
 
 export function registerFixTextCommands(context: vscode.ExtensionContext): void {

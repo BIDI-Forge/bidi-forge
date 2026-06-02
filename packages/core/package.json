@@ -1,7 +1,16 @@
 {
-  "name": "@rtl-text-fixer/core",
+  "name": "@bidi-forge/core",
   "version": "0.2.0",
-  "private": true,
+  "private": false,
+  "description": "Unicode BiDi engine for mixed Persian, Arabic, and English text",
+  "license": "MIT",
+  "files": ["dist", "README.md"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/BIDI-Forge/bidi-forge.git",
+    "directory": "packages/core"
+  },
+  "keywords": ["bidi", "rtl", "persian", "arabic", "unicode", "farsi"],
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

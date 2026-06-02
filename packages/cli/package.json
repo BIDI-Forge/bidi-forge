@@ -1,0 +1,28 @@
+{
+  "name": "@bidi-forge/cli",
+  "version": "0.1.0",
+  "description": "CLI for fixing mixed RTL/LTR text using @bidi-forge/core",
+  "type": "module",
+  "bin": {
+    "bidi-forge": "./dist/cli.js",
+    "rtl-text-fixer": "./dist/cli.js"
+  },
+  "files": ["dist"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/BIDI-Forge/bidi-forge.git",
+    "directory": "packages/cli"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "lint": "eslint src --max-warnings=0"
+  },
+  "dependencies": {
+    "@bidi-forge/core": "workspace:*"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

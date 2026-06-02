@@ -58,6 +58,34 @@
         </div>
       </section>
 
+      <section class="card card--scope" aria-label="Site scope">
+        <h2 class="card__label">Where to run</h2>
+        <div class="scope" role="radiogroup" aria-label="Site scope mode">
+          <label class="scope__option">
+            <input type="radio" name="scope" value="presets" />
+            <span>AI chat presets only</span>
+          </label>
+          <label class="scope__option">
+            <input type="radio" name="scope" value="all" />
+            <span>All websites</span>
+          </label>
+        </div>
+      </section>
+
+      <section class="card card--site" aria-label="Current tab">
+        <h2 class="card__label">Current tab</h2>
+        <p class="site__host" id="siteHost">—</p>
+        <p class="site__tier" id="siteTier">—</p>
+        <div class="card__row site__row">
+          <span class="card__sublabel">Fix on this site</span>
+          <label class="toggle" aria-label="Enable on this hostname">
+            <input id="siteEnabled" type="checkbox" checked />
+            <span class="toggle__track"></span>
+            <span class="toggle__thumb"></span>
+          </label>
+        </div>
+      </section>
+
       <section class="bento" aria-label="Supported AI chats">
         <article class="tile tile--brand tile--claude tile--wide">
           <span class="tile__badge">Primary focus</span>
@@ -87,20 +115,20 @@
           <h2 class="tile__title">Qwen</h2>
           <p class="tile__body">chat.qwen.ai composer and assistant replies.</p>
         </article>
-        <article class="tile tile--brand tile--copilot tile--soon">
-          <span class="tile__badge tile__badge--soon">Coming soon</span>
+        <article class="tile tile--brand tile--copilot">
+          <span class="tile__badge">Live</span>
           <h2 class="tile__title">Copilot</h2>
-          <p class="tile__body">Microsoft Copilot — planned support.</p>
+          <p class="tile__body">CSS-only ProseMirror composer + assistant message surfaces.</p>
         </article>
-        <article class="tile tile--brand tile--perplexity tile--soon">
-          <span class="tile__badge tile__badge--soon">Coming soon</span>
+        <article class="tile tile--brand tile--perplexity">
+          <span class="tile__badge">Live</span>
           <h2 class="tile__title">Perplexity</h2>
-          <p class="tile__body">Search-style answers — planned support.</p>
+          <p class="tile__body">Search-style answers and follow-up composer.</p>
         </article>
-        <article class="tile tile--brand tile--deepseek tile--soon">
-          <span class="tile__badge tile__badge--soon">Coming soon</span>
+        <article class="tile tile--brand tile--deepseek">
+          <span class="tile__badge">Live</span>
           <h2 class="tile__title">DeepSeek</h2>
-          <p class="tile__body">Chat composer — planned support.</p>
+          <p class="tile__body">chat.deepseek.com composer and reply bubbles.</p>
         </article>
       </section>
 

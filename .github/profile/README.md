@@ -102,7 +102,8 @@ When **RTL** scripts (Persian, Arabic) meet **LTR** text (English, URLs, code) i
 
 <br />
 
-[![VS Code](https://img.shields.io/badge/Install-VSIX-007ACC?style=for-the-badge&logo=visualstudiocode&logoColor=white)](https://github.com/BIDI-Forge/bidi-forge/tree/main/packages/vscode-extension)
+[![VS Code Marketplace](https://img.shields.io/badge/Install-Marketplace-007ACC?style=for-the-badge&logo=visualstudiocode&logoColor=white)](https://marketplace.visualstudio.com/items?itemName=amirmkazemi.rtl-text-fixer)
+[![VSIX (manual)](https://img.shields.io/badge/Install-VSIX-007ACC?style=flat-square&logo=visualstudiocode&logoColor=white)](https://github.com/BIDI-Forge/bidi-forge/tree/main/packages/vscode-extension)
 
 </td>
 </tr>
@@ -162,23 +163,23 @@ When **RTL** scripts (Persian, Arabic) meet **LTR** text (English, URLs, code) i
 <tr>
 <td align="center" width="33%">
 <br/>
-<img src="https://img.shields.io/badge/Copilot-Coming%20Soon-0078D4?style=for-the-badge&labelColor=1a1a2e&logo=microsoftcopilot&logoColor=white" alt="Copilot"/>
+<img src="https://img.shields.io/badge/Copilot-Live-0078D4?style=for-the-badge&labelColor=1a1a2e&logo=microsoftcopilot&logoColor=white" alt="Copilot"/>
 <br/><br/>
-<sub><b>🟡 Planned</b><br/>Microsoft Copilot<br/>composer &amp; replies</sub>
-<br/><br/>
-</td>
-<td align="center" width="33%">
-<br/>
-<img src="https://img.shields.io/badge/Perplexity-Coming%20Soon-20B8CD?style=for-the-badge&labelColor=1a1a2e" alt="Perplexity"/>
-<br/><br/>
-<sub><b>🟡 Planned</b><br/>Search-style<br/>answers &amp; follow-ups</sub>
+<sub><b>🟢 Live</b><br/>CSS-only composer<br/>+ message surfaces</sub>
 <br/><br/>
 </td>
 <td align="center" width="33%">
 <br/>
-<img src="https://img.shields.io/badge/DeepSeek-Coming%20Soon-4D6BFE?style=for-the-badge&labelColor=1a1a2e" alt="DeepSeek"/>
+<img src="https://img.shields.io/badge/Perplexity-Live-20B8CD?style=for-the-badge&labelColor=1a1a2e" alt="Perplexity"/>
 <br/><br/>
-<sub><b>🟡 Planned</b><br/>Chat composer<br/>+ message surfaces</sub>
+<sub><b>🟢 Live</b><br/>Search answers<br/>+ composer</sub>
+<br/><br/>
+</td>
+<td align="center" width="33%">
+<br/>
+<img src="https://img.shields.io/badge/DeepSeek-Live-4D6BFE?style=for-the-badge&labelColor=1a1a2e" alt="DeepSeek"/>
+<br/><br/>
+<sub><b>🟢 Live</b><br/>chat.deepseek.com<br/>composer + replies</sub>
 <br/><br/>
 </td>
 </tr>

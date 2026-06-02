@@ -12,6 +12,8 @@ Fix mixed Persian (RTL) and English (LTR) text readability issues by automatical
 - **Version (VS Code extension)**: 0.2.0
 - **Version (Chrome extension)**: 0.3.5
 - **Chrome Web Store**: [BIDI - Forge](https://chromewebstore.google.com/detail/ffngaifiipbklkbobombbgaeokinepdc)
+- **VS Code Marketplace**: [RTL Text Fixer](https://marketplace.visualstudio.com/items?itemName=amirmkazemi.rtl-text-fixer) (publish via `packages/vscode-extension/PUBLISHING.md`)
+- **Open VSX**: [RTL Text Fixer](https://open-vsx.org/extension/amirmkazemi/rtl-text-fixer)
 - **Stack**: TypeScript + pnpm (workspace) + Node.js 18+
 
 ## Features
@@ -72,6 +74,20 @@ pnpm lint
 ```
 
 ## Usage
+
+### CLI (`@bidi-forge/cli`)
+
+```bash
+pnpm -C packages/cli build
+echo "سلام hello دنیا" | node packages/cli/dist/cli.js fix
+```
+
+### npm package (`@bidi-forge/core`)
+
+```bash
+pnpm -C packages/core build
+# npm publish --access public (from packages/core)
+```
 
 ### Using the core engine
 

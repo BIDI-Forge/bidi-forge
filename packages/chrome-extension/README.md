@@ -17,7 +17,7 @@ pnpm install
 pnpm -C packages/chrome-extension build
 ```
 
-The extension bundle resolves `@rtl-text-fixer/core` from `packages/core/src` (esbuild `alias`), so you do **not** need to run `pnpm -C packages/core build` first for the Chrome `dist` output.
+The extension bundle resolves `@bidi-forge/core` from `packages/core/src` (esbuild `alias`), so you do **not** need to run `pnpm -C packages/core build` first for the Chrome `dist` output.
 
 Load unpacked from `packages/chrome-extension/dist` in `chrome://extensions` (Developer mode). After each rebuild, open `chrome://extensions` and click **Reload** on this extension.
 

@@ -3,7 +3,7 @@
  * Composers are handled in content.ts; this module fixes rendered markdown/ProseMirror output.
  */
 
-import { fixMixedText, stripBidiMarkers } from "@rtl-text-fixer/core";
+import { fixMixedText, stripBidiMarkers } from "@bidi-forge/core";
 
 import { fixBlockCoalescedTextNodes, shouldFixMixedText } from "./blockFix.js";
 import {
@@ -14,62 +14,21 @@ import {
   BIDI_LIST_SELECTOR,
 } from "./bidiDomStyles.js";
 import { querySelectorAllDeepFrom } from "./domDeep.js";
-import {
-  isChatGptHost,
-  isClaudeLikeHost,
-  isGeminiHost,
-  isGrokSurface,
-  isInsideCssOnlyComposer,
-} from "./cssOnlyComposer.js";
+import { getMessageRootSelectors as getAdapterMessageRoots } from "./adapters/registry.js";
+import { isInsideCssOnlyComposer } from "./cssOnlyComposer.js";
 
 const EDITABLE_SELECTOR =
   '[contenteditable="true"],textarea,[role="textbox"][contenteditable="true"]';
 
 const MESSAGE_BLOCK_SELECTOR = BIDI_BLOCK_SELECTOR;
 
-const CLAUDE_MESSAGE_ROOTS = [
-  '[data-testid="assistant-message"]',
-  '[data-testid="user-message"]',
-  ".standard-markdown",
-  ".font-claude-message",
-];
-
-/** ProseMirror output that is not the live composer. */
-const GENERIC_READONLY_PROSE = '.ProseMirror:not([contenteditable="true"])';
-
-const CHATGPT_MESSAGE_ROOTS = ["[data-message-author-role]"];
-
-/** Grok / xAI chat — avoid matching the live composer ProseMirror. */
-const GROK_MESSAGE_ROOTS = [
-  '[data-testid*="message"]',
-  '[class*="message-content"]',
-  '[class*="response"]',
-];
-
-/** Gemini assistant output — avoid `.ProseMirror` (matches the live Quill composer). */
-const GEMINI_MESSAGE_ROOTS = [
-  ".markdown",
-  ".message-content",
-  '[class*="model-response"]',
-  '[class*="response-container"]',
-  "message-content",
-];
-
 const hintedRoots = new WeakSet<HTMLElement>();
 const lastRootSignature = new WeakMap<HTMLElement, string>();
 
-export { isChatGptHost, isClaudeLikeHost } from "./cssOnlyComposer.js";
+export { isChatGptHost, isClaudeLikeHost } from "./adapters/hosts.js";
 
 export function getMessageRootSelectors(hostname: string, pathname = ""): string[] {
-  if (isGeminiHost(hostname)) return GEMINI_MESSAGE_ROOTS;
-  if (isGrokSurface(hostname, pathname)) {
-    return [...GROK_MESSAGE_ROOTS, GENERIC_READONLY_PROSE];
-  }
-  if (isChatGptHost(hostname)) return [...CHATGPT_MESSAGE_ROOTS, GENERIC_READONLY_PROSE];
-  if (isClaudeLikeHost(hostname)) {
-    return [...CLAUDE_MESSAGE_ROOTS, GENERIC_READONLY_PROSE];
-  }
-  return [GENERIC_READONLY_PROSE];
+  return getAdapterMessageRoots(hostname, pathname);
 }
 
 function shouldFixText(text: string): boolean {

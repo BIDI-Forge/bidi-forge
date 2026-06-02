@@ -828,3 +828,49 @@ body[data-powered="on"] .card--power {
   font-size: 0.62rem;
   opacity: 0.9;
 }
+
+/* ── Scope + current tab ───────────────────────────────────────────────────── */
+
+.card--scope .scope,
+.card--site {
+  padding: 0 16px 14px;
+}
+
+.scope {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.scope__option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.82rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.scope__option input {
+  accent-color: var(--accent);
+}
+
+.site__host {
+  margin: 6px 16px 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+  word-break: break-all;
+}
+
+.site__tier {
+  margin: 4px 16px 10px;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.site__row {
+  padding: 0 16px 14px;
+}

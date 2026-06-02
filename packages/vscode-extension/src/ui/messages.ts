@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { formatUiText } from "@rtl-text-fixer/core";
+import { formatUiText } from "@bidi-forge/core";
 import type { UiTextDirection } from "@rtl-text-fixer/shared";
 
 const CONFIG_SECTION = "rtlFixer";

@@ -3,8 +3,11 @@
  * CSS `dir=auto` + `unicode-bidi: plaintext` only; strip stray markers, never fixMixedText while typing.
  */
 
-import { stripBidiMarkers } from "@rtl-text-fixer/core";
+import { stripBidiMarkers } from "@bidi-forge/core";
 
+import { isAdapterLiveComposer, resolveAdapterComposerEditor } from "./adapters/composerResolve.js";
+import { isCssOnlyAdapter, resolveAdapter } from "./adapters/registry.js";
+import { isGeminiHost } from "./adapters/gemini.js";
 import {
   applyBlockBidiStyles,
   applyListContainerBidiStyles,
@@ -27,80 +30,23 @@ const CHATGPT_MESSAGE_BUBBLE_SELECTOR = "[data-message-author-role]";
 const CHATGPT_COMPOSER_SHELL_SELECTOR =
   '#prompt-textarea, form[data-type="unified-composer"], [data-testid="composer"], footer form, [class*="composer"]';
 
-// ── Host / surface ───────────────────────────────────────────────────────────
+// ── Host / surface (re-exported from adapters) ───────────────────────────────
 
-export function isGeminiHost(hostname: string): boolean {
-  const h = hostname.toLowerCase();
-  return h === "gemini.google.com" || h.endsWith(".gemini.google.com");
-}
-
-export function isGrokHost(hostname: string): boolean {
-  const h = hostname.toLowerCase();
-  return (
-    h === "grok.com" ||
-    h.endsWith(".grok.com") ||
-    h === "grok.x.com" ||
-    h.endsWith(".grok.x.com") ||
-    h === "x.ai" ||
-    h.endsWith(".x.ai")
-  );
-}
-
-function isXHost(hostname: string): boolean {
-  const h = hostname.toLowerCase();
-  return (
-    h === "x.com" ||
-    h.endsWith(".x.com") ||
-    h === "twitter.com" ||
-    h.endsWith(".twitter.com")
-  );
-}
-
-/** Grok UI on dedicated hosts or X/Twitter `/grok` routes only. */
-export function isGrokSurface(hostname: string, pathname = ""): boolean {
-  if (isGrokHost(hostname)) return true;
-  if (!isXHost(hostname)) return false;
-  const p = pathname.toLowerCase();
-  return p.includes("/grok");
-}
-
-export function isGoogleAiHost(hostname: string): boolean {
-  const h = hostname.toLowerCase();
-  return (
-    isGeminiHost(hostname) ||
-    h.includes("bard.google") ||
-    h === "ogs.google.com" ||
-    h.endsWith(".ogs.google.com") ||
-    h === "notebooklm.google.com" ||
-    h === "aistudio.google.com" ||
-    h === "labs.google.com"
-  );
-}
-
-export function isChatGptHost(hostname: string): boolean {
-  const h = hostname.toLowerCase();
-  return (
-    h === "chatgpt.com" ||
-    h.endsWith(".chatgpt.com") ||
-    h === "chat.openai.com" ||
-    h.endsWith(".chat.openai.com") ||
-    h === "openai.com" ||
-    h.endsWith(".openai.com")
-  );
-}
-
-export function isClaudeLikeHost(hostname: string): boolean {
-  const h = hostname.toLowerCase();
-  return h === "claude.ai" || h.endsWith(".claude.ai") || h.includes("anthropic.com");
-}
+export { isGeminiHost, isGoogleAiHost } from "./adapters/gemini.js";
+export { isChatGptHost } from "./adapters/chatgpt.js";
+export { isClaudeLikeHost } from "./adapters/claude.js";
+export { isGrokHost, isGrokSurface } from "./adapters/grok.js";
+export {
+  isCopilotHost,
+  isPerplexityHost,
+  isDeepSeekHost,
+} from "./adapters/hosts.js";
 
 export function isCssOnlySurface(hostname: string, pathname = ""): boolean {
-  return (
-    isGeminiHost(hostname) ||
-    isGrokSurface(hostname, pathname) ||
-    isChatGptHost(hostname) ||
-    isClaudeLikeHost(hostname)
-  );
+  const adapter = resolveAdapter(hostname, pathname);
+  if (!adapter) return false;
+  if (isCssOnlyAdapter(adapter)) return true;
+  return adapter.id === "claude";
 }
 
 // ── Gemini (Quill) ───────────────────────────────────────────────────────────
@@ -307,27 +253,40 @@ export function isClaudeLiveComposer(hostname: string, el: Element): boolean {
 
 // ── Unified ───────────────────────────────────────────────────────────────────
 
-export function resolveCssOnlyEditor(hostname: string, anchor: Element): HTMLElement | null {
+function anchorElement(node: Element | Node): Element | null {
+  return node instanceof Element ? node : node.parentElement;
+}
+
+export function resolveCssOnlyEditor(hostname: string, anchor: Element | Node): HTMLElement | null {
+  const el = anchorElement(anchor);
+  if (!el) return null;
+  const pathname = typeof location !== "undefined" ? location.pathname : "";
   return (
-    findGeminiQuillEditor(anchor) ??
-    resolveGrokEditor(hostname, anchor) ??
-    resolveChatGptEditor(hostname, anchor) ??
-    resolveClaudeEditor(hostname, anchor)
+    findGeminiQuillEditor(el) ??
+    resolveGrokEditor(hostname, el) ??
+    resolveChatGptEditor(hostname, el) ??
+    resolveClaudeEditor(hostname, el) ??
+    resolveAdapterComposerEditor(hostname, el, pathname)
   );
 }
 
 export function isCssOnlyComposer(hostname: string, el: Element): boolean {
+  const pathname = typeof location !== "undefined" ? location.pathname : "";
   if (isGeminiQuillComposer(hostname, el)) return true;
   if (isGrokLiveComposer(hostname, el)) return true;
   if (isChatGptLiveComposer(hostname, el)) return true;
-  return isClaudeLiveComposer(hostname, el);
+  if (isClaudeLiveComposer(hostname, el)) return true;
+  return isAdapterLiveComposer(hostname, el, pathname);
 }
 
-export function isInsideCssOnlyComposer(el: Element, hostname: string): boolean {
+/** Accepts text nodes from MutationObserver targets (no `.closest`). */
+export function isInsideCssOnlyComposer(node: Element | Node, hostname: string): boolean {
+  const el = anchorElement(node);
+  if (!el) return false;
   if (isInsideGeminiComposer(el, hostname)) return true;
   const ed = resolveCssOnlyEditor(hostname, el);
   if (!ed) return false;
-  return ed === el || ed.contains(el);
+  return ed === el || ed.contains(node);
 }
 
 // ── DOM maintenance ─────────────────────────────────────────────────────────

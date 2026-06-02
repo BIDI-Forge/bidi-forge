@@ -5,6 +5,9 @@ const STORAGE_KEY_ENABLED = "rtlTextFixerEnabled";
 const STORAGE_KEY_SITE_SCOPE = "rtlTextFixerSiteScope";
 const STORAGE_KEY_INCLUDE_HOSTS = "rtlTextFixerIncludeHosts";
 const STORAGE_KEY_EXCLUDE_HOSTS = "rtlTextFixerExcludeHosts";
+const STORAGE_KEY_HOST_OVERRIDES = "rtlTextFixerHostOverrides";
+
+export type HostOverrides = Record<string, boolean>;
 
 export function storageKey(): string {
   return STORAGE_KEY_ENABLED;
@@ -16,6 +19,7 @@ export const SYNC_SETTING_KEYS = [
   STORAGE_KEY_SITE_SCOPE,
   STORAGE_KEY_INCLUDE_HOSTS,
   STORAGE_KEY_EXCLUDE_HOSTS,
+  STORAGE_KEY_HOST_OVERRIDES,
 ] as const;
 
 export interface ExtensionRuntimeState {
@@ -23,12 +27,21 @@ export interface ExtensionRuntimeState {
   site: SiteScopeSettings;
 }
 
-function parseScopeMode(): SiteScopeMode {
-  return "all";
+function parseScopeMode(raw: unknown): SiteScopeMode {
+  return raw === "presets" ? "presets" : "all";
 }
 
 function asHostListText(raw: unknown): string {
   return typeof raw === "string" ? raw : "";
+}
+
+function parseHostOverrides(raw: unknown): HostOverrides {
+  if (!raw || typeof raw !== "object") return {};
+  const out: HostOverrides = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof v === "boolean") out[k.toLowerCase()] = v;
+  }
+  return out;
 }
 
 function parseSiteScopeSettings(result: Record<string, unknown>): SiteScopeSettings {
@@ -37,6 +50,10 @@ function parseSiteScopeSettings(result: Record<string, unknown>): SiteScopeSetti
     includeHosts: parseHostList(asHostListText(result[STORAGE_KEY_INCLUDE_HOSTS])),
     excludeHosts: parseHostList(asHostListText(result[STORAGE_KEY_EXCLUDE_HOSTS])),
   };
+}
+
+export interface ExtensionRuntimeStateWithOverrides extends ExtensionRuntimeState {
+  hostOverrides: HostOverrides;
 }
 
 export async function getEnabled(): Promise<boolean> {
@@ -64,13 +81,37 @@ export async function getSiteScopeSettings(): Promise<SiteScopeSettings> {
   });
 }
 
-export async function getExtensionRuntimeState(): Promise<ExtensionRuntimeState> {
-  return await new Promise<ExtensionRuntimeState>((resolve) => {
+export async function getHostOverrides(): Promise<HostOverrides> {
+  return await new Promise<HostOverrides>((resolve) => {
+    chrome.storage.sync.get(STORAGE_KEY_HOST_OVERRIDES, (result) => {
+      resolve(
+        parseHostOverrides((result as Record<string, unknown>)[STORAGE_KEY_HOST_OVERRIDES]),
+      );
+    });
+  });
+}
+
+export async function setHostOverride(hostname: string, enabled: boolean | null): Promise<void> {
+  const key = hostname.toLowerCase();
+  const overrides = await getHostOverrides();
+  if (enabled === null) {
+    delete overrides[key];
+  } else {
+    overrides[key] = enabled;
+  }
+  await new Promise<void>((resolve) => {
+    chrome.storage.sync.set({ [STORAGE_KEY_HOST_OVERRIDES]: overrides }, () => resolve());
+  });
+}
+
+export async function getExtensionRuntimeState(): Promise<ExtensionRuntimeStateWithOverrides> {
+  return await new Promise<ExtensionRuntimeStateWithOverrides>((resolve) => {
     chrome.storage.sync.get([...SYNC_SETTING_KEYS], (result) => {
       const r = result as Record<string, unknown>;
       resolve({
         enabled: Boolean(r[STORAGE_KEY_ENABLED] ?? true),
         site: parseSiteScopeSettings(r),
+        hostOverrides: parseHostOverrides(r[STORAGE_KEY_HOST_OVERRIDES]),
       });
     });
   });

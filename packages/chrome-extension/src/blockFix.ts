@@ -1,4 +1,4 @@
-import { fixMixedText, stripBidiMarkers } from "@rtl-text-fixer/core";
+import { fixMixedText, stripBidiMarkers } from "@bidi-forge/core";
 
 import { isInsideCssOnlyComposer } from "./cssOnlyComposer.js";
 

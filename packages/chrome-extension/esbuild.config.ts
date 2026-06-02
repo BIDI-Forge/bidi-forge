@@ -4,13 +4,15 @@ import { watch } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { presetHostMatchPatterns } from "./scripts/manifest-matches.mjs";
+
 const outdir = "dist";
 const isWatch = process.argv.includes("--watch");
 
 /** Bundle workspace packages from TypeScript sources so `pnpm -C packages/chrome-extension build` works without a prior `core` build. */
 const packagesDir = join(dirname(fileURLToPath(import.meta.url)), "..");
 const workspaceAliases: Record<string, string> = {
-  "@rtl-text-fixer/core": join(packagesDir, "core/src/index.ts"),
+  "@bidi-forge/core": join(packagesDir, "core/src/index.ts"),
   "@rtl-text-fixer/shared": join(packagesDir, "shared/src/index.ts"),
 };
 
@@ -42,6 +44,10 @@ async function copyStatic(): Promise<void> {
 
   const manifestRaw = await readFile("src/manifest.json", "utf8");
   const manifest = JSON.parse(manifestRaw) as Record<string, unknown>;
+  const contentScripts = manifest.content_scripts as Array<Record<string, unknown>> | undefined;
+  if (contentScripts?.[0]) {
+    contentScripts[0].matches = presetHostMatchPatterns();
+  }
   await writeFile(join(outdir, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
 }
 

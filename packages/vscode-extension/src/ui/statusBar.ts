@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { formatUiText } from "@rtl-text-fixer/core";
+import { formatUiText } from "@bidi-forge/core";
 import { onRtlUiStateChange, readRtlUiEnabled } from "../commands/rtlUi.js";
 
 let statusBarItem: vscode.StatusBarItem | undefined;

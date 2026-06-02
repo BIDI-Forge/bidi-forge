@@ -29,7 +29,8 @@
     "vscode": "^1.90.0"
   },
   "categories": [
-    "Other"
+    "Other",
+    "Formatters"
   ],
   "activationEvents": [
     "onCommand:rtlFixer.fixSelectedText",
@@ -52,7 +53,7 @@
         "rtlFixer.fixOnPaste": {
           "type": "boolean",
           "default": false,
-          "description": "Automatically fix mixed text on paste (reserved; not yet implemented)."
+          "description": "Automatically fix mixed RTL/LTR text when you paste into the editor."
         }
       }
     },
@@ -102,7 +103,7 @@
     "publish": "pnpm build && vsce publish --no-dependencies"
   },
   "dependencies": {
-    "@rtl-text-fixer/core": "workspace:*",
+    "@bidi-forge/core": "workspace:*",
     "@rtl-text-fixer/shared": "workspace:*"
   },
   "devDependencies": {

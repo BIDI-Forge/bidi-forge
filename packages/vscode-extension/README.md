@@ -24,7 +24,7 @@ A status bar item shows **RTL UI: فعال/غیرفعال** and opens the settin
 ## Settings
 
 - `rtlFixer.uiMessageDirection` — `rtl` (default), `ltr`, or `auto` for notification BiDi formatting
-- `rtlFixer.fixOnPaste` — reserved (not implemented yet)
+- `rtlFixer.fixOnPaste` — automatically fix mixed text when you paste (default: off)
 
 ## RTL UI (Workbench) setup
 

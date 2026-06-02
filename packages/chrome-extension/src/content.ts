@@ -1,4 +1,4 @@
-import { fixMixedText, stripBidiMarkers as stripBidiMarkersCore } from "@rtl-text-fixer/core";
+import { fixMixedText, stripBidiMarkers as stripBidiMarkersCore } from "@bidi-forge/core";
 
 import { tryFixMixedBlockCoalesced } from "./blockFix.js";
 import {
@@ -899,7 +899,12 @@ function currentPathname(): string {
 
 async function readEffectiveEnabled(): Promise<boolean> {
   const state = await getExtensionRuntimeState();
-  return computeEffectiveEnabled(state.enabled, currentHostname(), state.site);
+  const host = currentHostname();
+  const override = state.hostOverrides[host];
+  if (!state.enabled) return false;
+  if (override === false) return false;
+  if (override === true) return true;
+  return computeEffectiveEnabled(true, host, state.site);
 }
 
 function wireRuntimeListeners(): void {
