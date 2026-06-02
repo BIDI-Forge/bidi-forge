@@ -95,8 +95,8 @@
     ]
   },
   "scripts": {
-    "build": "node esbuild.config.ts",
-    "dev": "node esbuild.config.ts --watch",
+    "build": "node --experimental-strip-types esbuild.config.ts",
+    "dev": "node --experimental-strip-types esbuild.config.ts --watch",
     "test": "vitest run",
     "lint": "eslint \"src/**/*.ts\" esbuild.config.ts --ignore-pattern \"src/**/__tests__/**\" --max-warnings=0",
     "package": "pnpm build && vsce package --no-dependencies",

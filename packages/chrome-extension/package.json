@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "icons": "node scripts/generate-icons.mjs",
-    "build": "node scripts/generate-icons.mjs && node esbuild.config.ts",
+    "build": "node scripts/generate-icons.mjs && node --experimental-strip-types esbuild.config.ts",
     "pack:store": "pnpm build && node scripts/pack-store-zip.mjs",
-    "dev": "node esbuild.config.ts --watch",
+    "dev": "node --experimental-strip-types esbuild.config.ts --watch",
     "lint": "eslint src esbuild.config.ts --max-warnings=0",
     "test": "vitest run",
     "test:e2e": "playwright test"
