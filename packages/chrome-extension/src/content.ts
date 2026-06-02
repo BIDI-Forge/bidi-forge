@@ -86,6 +86,7 @@ function findMessageRootForNode(node: Node): HTMLElement | null {
   return root;
 }
 
+
 function isDeleteInputEvent(ev: Event): boolean {
   const inputType = (ev as InputEvent).inputType;
   return typeof inputType === "string" && inputType.startsWith("delete");
@@ -631,6 +632,16 @@ function wireCssOnlyComposerEditable(el: Element): void {
     { capture: true },
   );
   el.addEventListener(
+    "focus",
+    () => {
+      if (!enabled || programmaticEdit.has(el)) return;
+      const ed = resolveCssOnlyEditor(host, el);
+      if (ed) maintainCssOnlyComposerSafe(ed, el);
+      else applyCssOnlyBidiOverrides(host, el);
+    },
+    { passive: true },
+  );
+  el.addEventListener(
     "blur",
     () => {
       const prev = scheduledInputFix.get(el);
@@ -647,7 +658,7 @@ function wireCssOnlyComposerEditable(el: Element): void {
     { passive: true },
   );
 
-  if (editor) maintainCssOnlyComposerSafe(editor, el, "all");
+  if (editor) maintainCssOnlyComposerSafe(editor, el);
   else applyCssOnlyBidiOverrides(host, el);
 }
 
