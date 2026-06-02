@@ -4,10 +4,10 @@ import { tryFixMixedBlockCoalesced } from "./blockFix.js";
 import {
   applyBlockBidiStyles,
   applyBidiStylesToSubtree,
-  listComposerBlocks,
 } from "./bidiDomStyles.js";
 import { hookShadowRootsInTree, querySelectorAllDeepFrom } from "./domDeep.js";
 import {
+  applyComposerMarkersOnBlur,
   applyCssOnlyBidiOverrides,
   isCssOnlyComposer,
   isGoogleAiHost,
@@ -15,6 +15,8 @@ import {
   maintainCssOnlyComposer,
   resolveCssOnlyEditor,
 } from "./cssOnlyComposer.js";
+import { shouldPauseComposerDomFix } from "./selectionGuard.js";
+import { listComposerBlocks } from "./bidiDomStyles.js";
 import {
   scanMessageRoot,
   scanMessageSurfaces,
@@ -318,6 +320,7 @@ function listComposerBlocksFromRoot(root: HTMLElement): HTMLElement[] {
 function fixContentEditableRoot(root: HTMLElement, mode: "typing" | "full" = "typing"): boolean {
   if (!root.isContentEditable) return false;
   if (isInSkippedContainer(root)) return false;
+  if (mode === "typing" && shouldPauseComposerDomFix()) return false;
 
   const host = currentHostname();
   if (isCssOnlyComposer(host, root)) {
@@ -562,6 +565,18 @@ function flushQueue(): void {
   if (queued.size > 0) scheduleFlush();
 }
 
+function applyComposerMarkersOnBlurFix(el: Element, host: string): void {
+  const editor = resolveCssOnlyEditor(host, el);
+  if (!(editor instanceof HTMLElement)) return;
+  programmaticEdit.add(el);
+  runWithoutMutationFeedback(() => {
+    for (const block of listComposerBlocks(editor)) {
+      tryFixMixedBlockCoalesced(block, { allowInCssOnlyComposer: true });
+    }
+  });
+  programmaticEdit.delete(el);
+}
+
 function wireCssOnlyComposerEditable(el: Element): void {
   if (!(el instanceof HTMLElement)) return;
   const host = currentHostname();
@@ -570,6 +585,7 @@ function wireCssOnlyComposerEditable(el: Element): void {
   const editor = resolveCssOnlyEditor(host, el);
   const scheduleMaintain = () => {
     if (!enabled) return;
+    if (shouldPauseComposerDomFix()) return;
     if (programmaticEdit.has(el)) return;
     if (composing.get(el)) return;
     if (Date.now() < (skipComposerFixUntil.get(el) ?? 0)) return;
@@ -622,7 +638,11 @@ function wireCssOnlyComposerEditable(el: Element): void {
       scheduledInputFix.delete(el);
       if (!enabled || programmaticEdit.has(el)) return;
       const ed = resolveCssOnlyEditor(host, el);
-      if (ed) maintainCssOnlyComposerSafe(ed, el, "all");
+      if (applyComposerMarkersOnBlur(host)) {
+        applyComposerMarkersOnBlurFix(el, host);
+      } else if (ed) {
+        maintainCssOnlyComposerSafe(ed, el, "all");
+      }
     },
     { passive: true },
   );
@@ -646,6 +666,7 @@ function ensureEditableWired(el: Element): void {
 
   const runFix = (mode: "typing" | "full") => {
     if (!enabled) return;
+    if (mode === "typing" && shouldPauseComposerDomFix()) return;
     if (programmaticEdit.has(el)) return;
     if (composing.get(el)) return;
     if (Date.now() < (skipComposerFixUntil.get(el) ?? 0)) return;
@@ -665,6 +686,7 @@ function ensureEditableWired(el: Element): void {
 
   const schedule = () => {
     if (!enabled) return;
+    if (shouldPauseComposerDomFix()) return;
     if (programmaticEdit.has(el)) return;
     if (composing.get(el)) return;
     if (Date.now() < (skipComposerFixUntil.get(el) ?? 0)) return;
