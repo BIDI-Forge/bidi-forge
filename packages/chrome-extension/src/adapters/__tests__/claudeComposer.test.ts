@@ -5,6 +5,7 @@ import {
   isCssOnlyComposer,
   isCssOnlySurface,
   isInsideCssOnlyComposer,
+  maintainClaudeComposerEditor,
 } from "../../cssOnlyComposer.js";
 
 describe("Claude composer strategy", () => {
@@ -18,6 +19,13 @@ describe("Claude composer strategy", () => {
     expect(isCssOnlySurface("claude.ai")).toBe(false);
     expect(isCssOnlyComposer("claude.ai", prose)).toBe(true);
     expect(isInsideCssOnlyComposer(prose, "claude.ai")).toBe(true);
+
+    const para = document.createElement("p");
+    para.textContent = "سلام hello";
+    prose.append(para);
+    maintainClaudeComposerEditor(prose);
+    expect(para.style.getPropertyValue("direction")).toBe("");
+    expect(prose.style.getPropertyValue("unicode-bidi")).toBe("plaintext");
 
     prose.remove();
   });
