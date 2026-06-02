@@ -10,7 +10,7 @@ import { isCssOnlyAdapter, resolveAdapter } from "./adapters/registry.js";
 import { isChatGptHost } from "./adapters/chatgpt.js";
 import { isClaudeLikeHost } from "./adapters/claude.js";
 import { isGeminiHost } from "./adapters/gemini.js";
-import { isGrokSurface } from "./adapters/grok.js";
+import { grokAdapter } from "./adapters/grok.js";
 import {
   applyBlockBidiStyles,
   applyListContainerBidiStyles,
@@ -85,6 +85,12 @@ export function resolveGeminiQuillEditor(anchor: Element): HTMLElement | null {
 
 // ── Grok (ProseMirror / assistant-ui) ───────────────────────────────────────
 
+/** Local binding — `export { isGrokSurface } from` does not create a module-scoped name. */
+function isOnGrokSurface(hostname: string): boolean {
+  const pathname = typeof location !== "undefined" ? location.pathname : "";
+  return grokAdapter.matchesHost(hostname, pathname);
+}
+
 function isInsideGrokMessageBubble(el: Element): boolean {
   const bubble = el.closest(GROK_MESSAGE_BUBBLE_SELECTOR);
   if (!bubble) return false;
@@ -92,7 +98,7 @@ function isInsideGrokMessageBubble(el: Element): boolean {
 }
 
 function resolveGrokEditor(hostname: string, anchor: Element): HTMLElement | null {
-  if (!isGrokSurface(hostname)) return null;
+  if (!isOnGrokSurface(hostname)) return null;
 
   for (const sel of [
     '.ProseMirror[contenteditable="true"]',
@@ -127,7 +133,7 @@ function resolveGrokEditor(hostname: string, anchor: Element): HTMLElement | nul
 }
 
 export function isGrokLiveComposer(hostname: string, el: Element): boolean {
-  if (!isGrokSurface(hostname)) return false;
+  if (!isOnGrokSurface(hostname)) return false;
   const editor = resolveGrokEditor(hostname, el);
   if (!editor) return false;
   return editor === el || editor.contains(el);
