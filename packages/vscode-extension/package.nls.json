@@ -1,0 +1,10 @@
+{
+  "rtlFixer.configuration.title": "RTL Text Fixer",
+  "rtlFixer.uiMessageDirection.description": "Base direction for extension notification messages.",
+  "rtlFixer.fixOnPaste.description": "Automatically fix mixed RTL/LTR text when you paste into the editor.",
+  "rtlFixer.fixSelectedText.title": "RTL Fixer: Fix selected text",
+  "rtlFixer.fixClipboardText.title": "RTL Fixer: Fix clipboard text",
+  "rtlFixer.enableRtlUi.title": "RTL Fixer: Enable RTL UI (Custom CSS)",
+  "rtlFixer.disableRtlUi.title": "RTL Fixer: Disable RTL UI (Custom CSS)",
+  "rtlFixer.openSettings.title": "RTL Fixer: Settings and guide"
+}

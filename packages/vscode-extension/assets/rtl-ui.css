@@ -87,7 +87,21 @@ pre,
   unicode-bidi: isolate !important;
 }
 
-/* --- Cursor-specific (best-effort; DOM may change between releases) --- */
+/* --- VS Code / Copilot-style chat (1.90+) --- */
+.interactive-session,
+.interactive-session .interactive-input-part,
+.interactive-session .interactive-input-editor,
+.interactive-session .interactive-list .monaco-list-row .value,
+.interactive-session .chat-input-toolbars,
+.chat-view,
+.chat-view .interactive-session,
+.workbench .part.panel .chat-view {
+  direction: auto !important;
+  unicode-bidi: plaintext !important;
+  text-align: start !important;
+}
+
+/* --- Cursor Agent / Composer (best-effort; DOM may change between releases) --- */
 .aichat-panel,
 .aichat-panel .aislash-editor-input,
 .aichat-panel [contenteditable="true"],
@@ -95,7 +109,22 @@ pre,
 .composer-bar [contenteditable="true"],
 .chat-input-container,
 .chat-input-container textarea,
-.chat-input-container [contenteditable="true"] {
+.chat-input-container [contenteditable="true"],
+.cursor-agent-panel,
+.cursor-agent-panel [contenteditable="true"],
+.agent-input-area,
+.agent-input-area [contenteditable="true"],
+[data-component="composer-input"],
+[data-component="composer-input"] [contenteditable="true"] {
+  direction: auto !important;
+  unicode-bidi: plaintext !important;
+  text-align: start !important;
+}
+
+/* Chat message bodies: auto direction; keep code blocks LTR below */
+.interactive-session .rendered-markdown,
+.interactive-session .markdown-body,
+.aichat-panel .message-content {
   direction: auto !important;
   unicode-bidi: plaintext !important;
   text-align: start !important;

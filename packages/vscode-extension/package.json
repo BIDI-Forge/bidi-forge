@@ -42,41 +42,41 @@
   "main": "./dist/extension.cjs",
   "contributes": {
     "configuration": {
-      "title": "RTL Text Fixer",
+      "title": "%rtlFixer.configuration.title%",
       "properties": {
         "rtlFixer.uiMessageDirection": {
           "type": "string",
           "enum": ["rtl", "ltr", "auto"],
           "default": "rtl",
-          "description": "Base direction for extension notification messages."
+          "description": "%rtlFixer.uiMessageDirection.description%"
         },
         "rtlFixer.fixOnPaste": {
           "type": "boolean",
           "default": false,
-          "description": "Automatically fix mixed RTL/LTR text when you paste into the editor."
+          "description": "%rtlFixer.fixOnPaste.description%"
         }
       }
     },
     "commands": [
       {
         "command": "rtlFixer.fixSelectedText",
-        "title": "RTL Fixer: اصلاح متن انتخاب‌شده"
+        "title": "%rtlFixer.fixSelectedText.title%"
       },
       {
         "command": "rtlFixer.fixClipboardText",
-        "title": "RTL Fixer: اصلاح متن کلیپ‌بورد"
+        "title": "%rtlFixer.fixClipboardText.title%"
       },
       {
         "command": "rtlFixer.enableRtlUi",
-        "title": "RTL Fixer: فعال‌سازی RTL برای UI (با Custom CSS)"
+        "title": "%rtlFixer.enableRtlUi.title%"
       },
       {
         "command": "rtlFixer.disableRtlUi",
-        "title": "RTL Fixer: غیرفعال‌سازی RTL برای UI (با Custom CSS)"
+        "title": "%rtlFixer.disableRtlUi.title%"
       },
       {
         "command": "rtlFixer.openSettings",
-        "title": "RTL Fixer: تنظیمات و راهنما"
+        "title": "%rtlFixer.openSettings.title%"
       }
     ],
     "keybindings": [
@@ -95,11 +95,12 @@
     ]
   },
   "scripts": {
-    "build": "node esbuild.config.ts",
-    "dev": "node esbuild.config.ts --watch",
+    "build": "node --experimental-strip-types esbuild.config.ts",
+    "dev": "node --experimental-strip-types esbuild.config.ts --watch",
     "test": "vitest run",
     "lint": "eslint \"src/**/*.ts\" esbuild.config.ts --ignore-pattern \"src/**/__tests__/**\" --max-warnings=0",
     "package": "pnpm build && vsce package --no-dependencies",
+    "smoke:vsix": "node ../../scripts/smoke-vsix.mjs",
     "publish": "pnpm build && vsce publish --no-dependencies"
   },
   "dependencies": {
