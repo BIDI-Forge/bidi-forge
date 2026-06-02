@@ -9,11 +9,11 @@ Fix mixed Persian (RTL) and English (LTR) text readability issues by automatical
 ## Badges
 
 - **License**: MIT
-- **Version (VS Code extension)**: 0.2.0
+- **Version (VS Code extension)**: 0.3.2
 - **Version (Chrome extension)**: 0.3.5
 - **Chrome Web Store**: [BIDI - Forge](https://chromewebstore.google.com/detail/ffngaifiipbklkbobombbgaeokinepdc)
 - **VS Code Marketplace**: [RTL Text Fixer](https://marketplace.visualstudio.com/items?itemName=amirmkazemi.rtl-text-fixer) (publish via `packages/vscode-extension/PUBLISHING.md`)
-- **Open VSX**: [RTL Text Fixer](https://open-vsx.org/extension/amirmkazemi/rtl-text-fixer)
+- **Open VSX**: [BIDI · Forge](https://open-vsx.org/extension/amirmkazemi/bidi-forge)
 - **Stack**: TypeScript + pnpm (workspace) + Node.js 18+
 
 ## Features
@@ -114,7 +114,7 @@ VS Code extensions **cannot** officially flip the whole workbench UI to RTL. Thi
 
 High-level steps:
 
-- Install `packages/vscode-extension/rtl-text-fixer-*.vsix`
+- Install `packages/vscode-extension/BIDI-Forge-*.vsix`
 - Install `be5invis.vscode-custom-css` (optional; only for RTL UI)
 - Run: `RTL Fixer: فعال‌سازی RTL برای UI (با Custom CSS)`
 - Run: `Enable Custom CSS and JS` (or `Reload Custom CSS and JS`)
