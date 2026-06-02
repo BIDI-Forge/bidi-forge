@@ -30,13 +30,12 @@ function isAsciiPunctuation(ch: string): boolean {
 
 export function getCharClass(ch: string): CharClass {
   if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") return "SPACE";
+  // Arabic-Indic / Persian digits before PERSIAN_RE (U+06F0–06FF overlaps)
+  if (/[\u06F0-\u06F9\u0660-\u0669]/.test(ch)) return "NUMBER";
   if (PERSIAN_RE.test(ch) || HEBREW_RE.test(ch)) return "RTL";
   if (ENGLISH_RE.test(ch)) return "LTR";
   if (NUMBER_RE.test(ch)) return "NUMBER";
   if (isAsciiPunctuation(ch)) return "PUNCT";
-
-  // Arabic-Indic digits (commonly used in Persian contexts)
-  if (/[\u06F0-\u06F9\u0660-\u0669]/.test(ch)) return "NUMBER";
 
   // Persian/Arabic punctuation (، ؛ ؟)
   if (/[\u060C\u061B\u061F]/.test(ch)) return "PUNCT";

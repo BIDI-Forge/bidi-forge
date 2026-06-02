@@ -11,7 +11,15 @@ export {
 } from "./bidiFixer.js";
 export { normalizeText } from "./normalize.js";
 export { stripBidiMarkers, wrapIsolate, wrapLrm, wrapRlm, hasBidiMarkers } from "./isolates.js";
-export { detectParagraphDirection, detectFirstStrongDirection, needsLeadingRlmForRtlParagraph } from "./detectDirection.js";
+export {
+  detectParagraphDirection,
+  detectFirstStrongDirection,
+  needsLeadingRlmForRtlParagraph,
+  needsLeadingLrmForLtrMixedParagraph,
+  isEnglishFirstMixedLine,
+  hasRtlStrong,
+  hasLtrStrong,
+} from "./detectDirection.js";
 export { formatUiText } from "./formatUiText.js";
 export { findAtomicLtrSpans } from "./runs.js";
 export { iterateGraphemes } from "./segments.js";
@@ -21,8 +29,12 @@ import { normalizeText } from "./normalize.js";
 import { stripBidiMarkers } from "./isolates.js";
 import { tokenizeNormalized } from "./tokenizer.js";
 import { applyBidiMarkers } from "./bidiFixer.js";
-import { detectParagraphDirection, needsLeadingRlmForRtlParagraph } from "./detectDirection.js";
-import { RLM } from "./isolates.js";
+import {
+  detectParagraphDirection,
+  needsLeadingLrmForLtrMixedParagraph,
+  needsLeadingRlmForRtlParagraph,
+} from "./detectDirection.js";
+import { LRM, RLM } from "./isolates.js";
 
 export function fixMixedText(text: string, options?: FixMixedTextOptions): string {
   const mode = options?.mode ?? "enhanced";
@@ -41,6 +53,11 @@ export function fixMixedText(text: string, options?: FixMixedTextOptions): strin
   let output = fixed.map((t) => t.value).join("");
   if (needsLeadingRlmForRtlParagraph(prepared, paragraphDirection) && !output.startsWith(RLM)) {
     output = RLM + output;
+  } else if (
+    needsLeadingLrmForLtrMixedParagraph(prepared, paragraphDirection) &&
+    !output.startsWith(LRM)
+  ) {
+    output = LRM + output;
   }
   return output;
 }

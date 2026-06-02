@@ -6,6 +6,7 @@ import {
   detectParagraphDirection,
   detectFirstStrongDirection,
   needsLeadingRlmForRtlParagraph,
+  needsLeadingLrmForLtrMixedParagraph,
   LRM,
   RLM,
   LRI,
@@ -76,6 +77,56 @@ describe("fixMixedText", () => {
   it("does not prepend RLM for English-first mixed lines", () => {
     const output = fixMixedText("hello سلام");
     expect(output.startsWith(RLM)).toBe(false);
+    expect(output).toContain(`${RLM}سلام${RLM}`);
+  });
+
+  it("wraps Persian in English-first sentences", () => {
+    const input = "Hello, how are you? من خوبم.";
+    const output = fixMixedText(input);
+    expect(output.startsWith(RLM)).toBe(false);
+    expect(stripBidiMarkers(output)).toBe(input);
+    expect(output).toContain(RLM);
+    expect(output).toMatch(/\u200fمن\u200f/);
+  });
+
+  it("treats English-first mixed lines as LTR even when Persian has more letters", () => {
+    expect(detectParagraphDirection("hello سلام")).toBe("ltr");
+    expect(detectParagraphDirection("42. Hello من خوبم")).toBe("ltr");
+    expect(detectParagraphDirection("React در JS خیلی محبوب است")).toBe("rtl");
+    const output = fixMixedText("test سلام");
+    expect(output).toContain(`${RLM}سلام${RLM}`);
+  });
+
+  it("prepends LRM for emoji, list, or number prefix then English then Persian", () => {
+    const cases = [
+      "😀 Hello سلام",
+      "1. Hello سلام",
+      "- Hello سلام",
+      "• Hello سلام",
+      "42. Hello من خوبم",
+      "۱. Hello سلام",
+    ];
+
+    for (const input of cases) {
+      expect(detectParagraphDirection(input)).toBe("ltr");
+      expect(needsLeadingLrmForLtrMixedParagraph(input, "ltr")).toBe(true);
+      const output = fixMixedText(input);
+      expect(output.startsWith(LRM), `expected leading LRM for ${input}`).toBe(true);
+      expect(stripBidiMarkers(output)).toBe(input);
+      expect(output).toMatch(/\u200f[\u0600-\u06FF]/);
+    }
+  });
+
+  it("still prepends RLM for RTL-first lines with weak leading", () => {
+    const input = "1. سلام hello";
+    expect(detectParagraphDirection(input)).toBe("rtl");
+    expect(fixMixedText(input).startsWith(RLM)).toBe(true);
+    expect(stripBidiMarkers(fixMixedText(input))).toBe(input);
+  });
+
+  it("classifies Persian list digits as numbers not RTL letters", () => {
+    expect(detectFirstStrongDirection("۱. Hello سلام")).toBe("ltr");
+    expect(detectParagraphDirection("۱. Hello سلام")).toBe("ltr");
   });
 });
 

@@ -7,6 +7,7 @@ import { stripBidiMarkers } from "@bidi-forge/core";
 
 import { isAdapterLiveComposer, resolveAdapterComposerEditor } from "./adapters/composerResolve.js";
 import { isCssOnlyAdapter, resolveAdapter } from "./adapters/registry.js";
+import { isClaudeLikeHost } from "./adapters/claude.js";
 import { isGeminiHost } from "./adapters/gemini.js";
 import {
   applyBlockBidiStyles,
@@ -34,7 +35,7 @@ const CHATGPT_COMPOSER_SHELL_SELECTOR =
 
 export { isGeminiHost, isGoogleAiHost } from "./adapters/gemini.js";
 export { isChatGptHost } from "./adapters/chatgpt.js";
-export { isClaudeLikeHost } from "./adapters/claude.js";
+export { isClaudeLikeHost };
 export { isGrokHost, isGrokSurface } from "./adapters/grok.js";
 export {
   isCopilotHost,
@@ -42,11 +43,10 @@ export {
   isDeepSeekHost,
 } from "./adapters/hosts.js";
 
+/** Hosts where the live composer must not receive LRM/RLM (CSS hints only). */
 export function isCssOnlySurface(hostname: string, pathname = ""): boolean {
   const adapter = resolveAdapter(hostname, pathname);
-  if (!adapter) return false;
-  if (isCssOnlyAdapter(adapter)) return true;
-  return adapter.id === "claude";
+  return isCssOnlyAdapter(adapter);
 }
 
 // ── Gemini (Quill) ───────────────────────────────────────────────────────────
@@ -261,26 +261,31 @@ export function resolveCssOnlyEditor(hostname: string, anchor: Element | Node): 
   const el = anchorElement(anchor);
   if (!el) return null;
   const pathname = typeof location !== "undefined" ? location.pathname : "";
+  if (isClaudeLikeHost(hostname)) return resolveClaudeEditor(hostname, el);
   return (
     findGeminiQuillEditor(el) ??
     resolveGrokEditor(hostname, el) ??
     resolveChatGptEditor(hostname, el) ??
-    resolveClaudeEditor(hostname, el) ??
     resolveAdapterComposerEditor(hostname, el, pathname)
   );
 }
 
 export function isCssOnlyComposer(hostname: string, el: Element): boolean {
+  if (isClaudeLikeHost(hostname)) return false;
   const pathname = typeof location !== "undefined" ? location.pathname : "";
   if (isGeminiQuillComposer(hostname, el)) return true;
   if (isGrokLiveComposer(hostname, el)) return true;
   if (isChatGptLiveComposer(hostname, el)) return true;
-  if (isClaudeLiveComposer(hostname, el)) return true;
   return isAdapterLiveComposer(hostname, el, pathname);
 }
 
 /** Accepts text nodes from MutationObserver targets (no `.closest`). */
-export function isInsideCssOnlyComposer(node: Element | Node, hostname: string): boolean {
+export function isInsideCssOnlyComposer(
+  node: Element | Node,
+  hostname: string,
+  pathname = "",
+): boolean {
+  if (!isCssOnlySurface(hostname, pathname)) return false;
   const el = anchorElement(node);
   if (!el) return false;
   if (isInsideGeminiComposer(el, hostname)) return true;
