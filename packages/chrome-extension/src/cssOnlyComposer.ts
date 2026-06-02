@@ -7,8 +7,10 @@ import { stripBidiMarkers } from "@bidi-forge/core";
 
 import { isAdapterLiveComposer, resolveAdapterComposerEditor } from "./adapters/composerResolve.js";
 import { isCssOnlyAdapter, resolveAdapter } from "./adapters/registry.js";
+import { isChatGptHost } from "./adapters/chatgpt.js";
 import { isClaudeLikeHost } from "./adapters/claude.js";
 import { isGeminiHost } from "./adapters/gemini.js";
+import { isGrokSurface } from "./adapters/grok.js";
 import {
   applyBlockBidiStyles,
   applyListContainerBidiStyles,
@@ -241,6 +243,16 @@ function resolveClaudeEditor(hostname: string, anchor: Element): HTMLElement | n
     return anchor;
   }
 
+  if (
+    anchor instanceof HTMLElement &&
+    anchor.classList.contains("ProseMirror") &&
+    anchor.getAttribute("contenteditable") != null &&
+    anchor.getAttribute("contenteditable") !== "false" &&
+    !isInsideClaudeMessageBubble(anchor)
+  ) {
+    return anchor;
+  }
+
   return null;
 }
 
@@ -271,12 +283,17 @@ export function resolveCssOnlyEditor(hostname: string, anchor: Element | Node): 
 }
 
 export function isCssOnlyComposer(hostname: string, el: Element): boolean {
-  if (isClaudeLikeHost(hostname)) return false;
   const pathname = typeof location !== "undefined" ? location.pathname : "";
+  if (isClaudeLiveComposer(hostname, el)) return true;
   if (isGeminiQuillComposer(hostname, el)) return true;
   if (isGrokLiveComposer(hostname, el)) return true;
   if (isChatGptLiveComposer(hostname, el)) return true;
   return isAdapterLiveComposer(hostname, el, pathname);
+}
+
+/** Claude: CSS while typing; Unicode markers applied on blur before send. */
+export function applyComposerMarkersOnBlur(hostname: string): boolean {
+  return isClaudeLikeHost(hostname);
 }
 
 /** Accepts text nodes from MutationObserver targets (no `.closest`). */
@@ -285,9 +302,14 @@ export function isInsideCssOnlyComposer(
   hostname: string,
   pathname = "",
 ): boolean {
-  if (!isCssOnlySurface(hostname, pathname)) return false;
   const el = anchorElement(node);
   if (!el) return false;
+  if (isClaudeLikeHost(hostname)) {
+    const ed = resolveClaudeEditor(hostname, el);
+    if (!ed) return false;
+    return ed === el || ed.contains(node);
+  }
+  if (!isCssOnlySurface(hostname, pathname)) return false;
   if (isInsideGeminiComposer(el, hostname)) return true;
   const ed = resolveCssOnlyEditor(hostname, el);
   if (!ed) return false;

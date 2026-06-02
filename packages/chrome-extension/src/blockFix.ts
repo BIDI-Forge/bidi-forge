@@ -200,13 +200,23 @@ export function lastStrongBeforeCaretLogical(block: HTMLElement): "ltr" | "rtl" 
   return lastStrongBeforeCaret(block);
 }
 
-export function tryFixMixedBlockCoalesced(block: HTMLElement): boolean {
+export interface FixBlockOptions {
+  /** Apply markers even inside CSS-only composers (e.g. Claude on blur). */
+  allowInCssOnlyComposer?: boolean;
+}
+
+export function tryFixMixedBlockCoalesced(
+  block: HTMLElement,
+  options?: FixBlockOptions,
+): boolean {
   if (block.closest("pre")) return false;
   if (block.matches("pre, code, kbd, samp")) return false;
   if (block.querySelector("pre, code, kbd, samp, a[href]")) return false;
 
   const host = typeof location !== "undefined" ? location.hostname : "";
-  if (host && isInsideCssOnlyComposer(block, host)) return false;
+  if (host && isInsideCssOnlyComposer(block, host) && !options?.allowInCssOnlyComposer) {
+    return false;
+  }
 
   const raw = stripBidiMarkers(block.textContent ?? "");
   if (!raw.trim() || !shouldFixMixedText(raw)) return false;
@@ -214,8 +224,15 @@ export function tryFixMixedBlockCoalesced(block: HTMLElement): boolean {
   const fixed = fixMixedText(raw);
   if (fixed === raw) return false;
 
+  const doc = block.ownerDocument;
+  const sel = doc.getSelection?.();
+  const hadRangeSelection =
+    sel && sel.rangeCount > 0 && !sel.isCollapsed && block.contains(sel.anchorNode);
+  const savedRange = hadRangeSelection ? sel.getRangeAt(0).cloneRange() : null;
+
   const focused = isBlockFocused(block);
-  const logicalCaret = focused ? getCaretLogicalOffsetInBlock(block) : null;
+  const logicalCaret =
+    focused && !hadRangeSelection ? getCaretLogicalOffsetInBlock(block) : null;
 
   let changed = false;
   if (block.childElementCount === 0) {
@@ -225,7 +242,14 @@ export function tryFixMixedBlockCoalesced(block: HTMLElement): boolean {
     changed = fixBlockCoalescedTextNodes(block, fixed);
   }
 
-  if (changed && focused && logicalCaret !== null) {
+  if (changed && savedRange) {
+    try {
+      sel.removeAllRanges();
+      sel.addRange(savedRange);
+    } catch {
+      /* range may be invalid after DOM rewrite */
+    }
+  } else if (changed && focused && logicalCaret !== null) {
     const domCaret = mapOffsetThroughMarkerFix(raw, fixed, logicalCaret);
     setCaretDomOffsetInBlock(block, domCaret);
   }
