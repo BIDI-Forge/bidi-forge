@@ -101,7 +101,7 @@ pre,
   text-align: start !important;
 }
 
-/* --- Cursor Agent / Composer (best-effort; DOM may change between releases) --- */
+/* --- Editor agent / composer panels (best-effort; DOM may change between releases) --- */
 .aichat-panel,
 .aichat-panel .aislash-editor-input,
 .aichat-panel [contenteditable="true"],

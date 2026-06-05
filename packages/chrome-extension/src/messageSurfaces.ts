@@ -15,7 +15,7 @@ import {
 } from "./bidiDomStyles.js";
 import { querySelectorAllDeepFrom } from "./domDeep.js";
 import { getMessageRootSelectors as getAdapterMessageRoots } from "./adapters/registry.js";
-import { isInsideCssOnlyComposer } from "./cssOnlyComposer.js";
+import { isInClaudeLiveComposer, isInsideCssOnlyComposer } from "./cssOnlyComposer.js";
 
 const EDITABLE_SELECTOR =
   '[contenteditable="true"],textarea,[role="textbox"][contenteditable="true"]';
@@ -42,11 +42,21 @@ function isInsideEditable(el: Element): boolean {
 function applyReaderBidiStack(root: HTMLElement): void {
   applyBlockBidiStyles(root);
 
-  for (const el of root.querySelectorAll(`${MESSAGE_BLOCK_SELECTOR}, ${BIDI_LIST_SELECTOR}, table, .markdown, .prose`)) {
+  for (const el of root.querySelectorAll(`${MESSAGE_BLOCK_SELECTOR}, table, .markdown, .prose`)) {
     if (!(el instanceof HTMLElement)) continue;
-    if (el.tagName === "OL" || el.tagName === "UL") applyListContainerBidiStyles(el);
-    else if (el.tagName === "LI") applyListItemBidiStyles(el);
-    else applyBlockBidiStyles(el);
+    if (el.tagName === "LI") continue;
+    applyBlockBidiStyles(el);
+  }
+
+  for (const list of root.querySelectorAll(BIDI_LIST_SELECTOR)) {
+    if (!(list instanceof HTMLElement)) continue;
+    list.setAttribute("dir", "auto");
+    list.style.setProperty("unicode-bidi", "plaintext");
+    list.style.setProperty("direction", "auto");
+  }
+
+  for (const li of root.querySelectorAll(`${BIDI_LIST_SELECTOR} > li`)) {
+    if (li instanceof HTMLElement) applyListItemBidiStyles(li);
   }
 
   for (const code of root.querySelectorAll("pre, code")) {
@@ -60,6 +70,7 @@ function applyReaderBidiStack(root: HTMLElement): void {
 }
 
 function fixReadOnlyBlock(block: HTMLElement): boolean {
+  if (isInClaudeLiveComposer(block)) return false;
   if (block.closest("pre")) return false;
   if (block.matches("pre, code, kbd, samp")) return false;
   if (block.querySelector("pre")) return false;
@@ -103,11 +114,19 @@ export function scanMessageRoot(root: HTMLElement, hostname: string): void {
   const signature = stripBidiMarkers(root.textContent ?? "");
   if (lastRootSignature.get(root) === signature) return;
 
-  for (const block of root.querySelectorAll(`${MESSAGE_BLOCK_SELECTOR}, li > p`)) {
+  for (const block of root.querySelectorAll(MESSAGE_BLOCK_SELECTOR)) {
     if (!(block instanceof HTMLElement)) continue;
+    if (block.tagName === "LI") continue;
     if (isInsideEditable(block)) continue;
     if (isInsideCssOnlyComposer(block, hostname)) continue;
     if (block.closest("#prompt-textarea")) continue;
+    fixReadOnlyBlock(block);
+  }
+
+  for (const block of root.querySelectorAll("li > p")) {
+    if (!(block instanceof HTMLElement)) continue;
+    if (isInsideEditable(block)) continue;
+    if (isInsideCssOnlyComposer(block, hostname)) continue;
     fixReadOnlyBlock(block);
   }
 
