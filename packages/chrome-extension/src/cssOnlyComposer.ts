@@ -22,6 +22,14 @@ import { getCaretLogicalOffsetInBlock, setCaretLogicalOffsetInBlock } from "./bl
 
 const BIDI_MARKER_RE = /[\u200E\u200F\u2066-\u2069]/;
 
+/** ProseMirror/tiptap often expose `contenteditable` via attribute before `isContentEditable` is true. */
+function isLiveComposerElement(el: HTMLElement): boolean {
+  if (el instanceof HTMLTextAreaElement) return !el.disabled;
+  if (el.isContentEditable) return true;
+  const ce = el.getAttribute("contenteditable");
+  return ce != null && ce !== "false";
+}
+
 const GROK_COMPOSER_SHELL_SELECTOR =
   '[class*="composer"], [class*="Composer"], [data-testid*="composer"], [data-testid*="Composer"], form, [role="textbox"][contenteditable]';
 
@@ -85,7 +93,6 @@ export function resolveGeminiQuillEditor(anchor: Element): HTMLElement | null {
 
 // ── Grok (ProseMirror / assistant-ui) ───────────────────────────────────────
 
-/** Local binding — `export { isGrokSurface } from` does not create a module-scoped name. */
 function isOnGrokSurface(hostname: string): boolean {
   const pathname = typeof location !== "undefined" ? location.pathname : "";
   return grokAdapter.matchesHost(hostname, pathname);
@@ -219,6 +226,9 @@ function resolveClaudeEditor(hostname: string, anchor: Element): HTMLElement | n
   if (!isClaudeLikeHost(hostname)) return null;
 
   for (const sel of [
+    '[data-testid="chat-input"]',
+    '.tiptap[contenteditable="true"]',
+    '.tiptap[contenteditable=""]',
     '.ProseMirror[contenteditable="true"]',
     '.ProseMirror[contenteditable=""]',
     '[contenteditable="true"][role="textbox"]',
@@ -226,7 +236,7 @@ function resolveClaudeEditor(hostname: string, anchor: Element): HTMLElement | n
     const found = anchor.closest(sel);
     if (
       found instanceof HTMLElement &&
-      found.isContentEditable &&
+      isLiveComposerElement(found) &&
       !isInsideClaudeMessageBubble(found)
     ) {
       return found;
@@ -235,8 +245,10 @@ function resolveClaudeEditor(hostname: string, anchor: Element): HTMLElement | n
 
   const shell = anchor.closest(CLAUDE_COMPOSER_SHELL_SELECTOR);
   if (shell) {
-    const ce = shell.querySelector('.ProseMirror[contenteditable="true"], [contenteditable="true"][role="textbox"]');
-    if (ce instanceof HTMLElement && ce.isContentEditable && !isInsideClaudeMessageBubble(ce)) {
+    const ce = shell.querySelector(
+      '[data-testid="chat-input"], .tiptap[contenteditable="true"], .ProseMirror[contenteditable="true"], [contenteditable="true"][role="textbox"]',
+    );
+    if (ce instanceof HTMLElement && isLiveComposerElement(ce) && !isInsideClaudeMessageBubble(ce)) {
       return ce;
     }
     const ta = shell.querySelector("textarea:not([disabled])");
@@ -251,7 +263,9 @@ function resolveClaudeEditor(hostname: string, anchor: Element): HTMLElement | n
 
   if (
     anchor instanceof HTMLElement &&
-    anchor.classList.contains("ProseMirror") &&
+    (anchor.classList.contains("ProseMirror") ||
+      anchor.classList.contains("tiptap") ||
+      anchor.getAttribute("data-testid") === "chat-input") &&
     anchor.getAttribute("contenteditable") != null &&
     anchor.getAttribute("contenteditable") !== "false" &&
     !isInsideClaudeMessageBubble(anchor)
@@ -260,6 +274,34 @@ function resolveClaudeEditor(hostname: string, anchor: Element): HTMLElement | n
   }
 
   return null;
+}
+
+const CLAUDE_LIVE_COMPOSER_SELECTOR =
+  '[data-testid="chat-input"], .tiptap[contenteditable="true"], .tiptap[contenteditable=""], .ProseMirror[contenteditable="true"], .ProseMirror[contenteditable=""][role="textbox"]';
+
+function resolveClaudeComposerFromDom(el: Element): HTMLElement | null {
+  const found = el.closest(CLAUDE_LIVE_COMPOSER_SELECTOR);
+  if (!(found instanceof HTMLElement) || !isLiveComposerElement(found)) return null;
+  if (isInsideClaudeMessageBubble(found)) return null;
+  return found;
+}
+
+/** True when node is inside Claude's live composer (not assistant/user message bubbles). */
+export function isInClaudeLiveComposer(node: Node, hostname?: string): boolean {
+  const el = anchorElement(node);
+  if (!el) return false;
+
+  const byDom = resolveClaudeComposerFromDom(el);
+  if (byDom) {
+    const host = (hostname ?? (typeof location !== "undefined" ? location.hostname : "")).toLowerCase();
+    if (!host || isClaudeLikeHost(host)) return byDom === el || byDom.contains(node);
+  }
+
+  const host = (hostname ?? (typeof location !== "undefined" ? location.hostname : "")).toLowerCase();
+  if (!isClaudeLikeHost(host)) return false;
+  const ed = resolveClaudeEditor(host, el);
+  if (!ed) return false;
+  return ed === el || ed.contains(node);
 }
 
 export function isClaudeLiveComposer(hostname: string, el: Element): boolean {
@@ -297,9 +339,9 @@ export function isCssOnlyComposer(hostname: string, el: Element): boolean {
   return isAdapterLiveComposer(hostname, el, pathname);
 }
 
-/** Claude: CSS while typing; Unicode markers applied on blur before send. */
+/** Claude: CSS-only in composer — no Unicode markers (they break ProseMirror typing). */
 export function applyComposerMarkersOnBlur(hostname: string): boolean {
-  return isClaudeLikeHost(hostname);
+  return false;
 }
 
 /** Accepts text nodes from MutationObserver targets (no `.closest`). */
@@ -341,6 +383,7 @@ function getCaretBlockInEditor(editor: HTMLElement): HTMLElement | null {
 
 const geminiDirObservers = new WeakMap<HTMLElement, MutationObserver>();
 const cssOnlyEditorHinted = new WeakSet<HTMLElement>();
+const claudeParagraphHinted = new WeakSet<HTMLElement>();
 
 function syncBlockBidiStyles(block: HTMLElement): void {
   block.classList.remove("ql-direction-rtl", "ql-direction-ltr");
@@ -383,6 +426,12 @@ function ensureCssOnlyEditorStyles(editor: HTMLElement, scope: "caret" | "all", 
 }
 
 export function applyCssOnlyBidiOverrides(hostname: string, anchor: HTMLElement): void {
+  if (isClaudeLikeHost(hostname)) {
+    const editor = resolveClaudeEditor(hostname, anchor);
+    if (editor) hintClaudeComposerOnce(editor);
+    return;
+  }
+
   if (isGeminiHost(hostname)) {
     const targets = new Set<HTMLElement>();
     for (const sel of [".ql-editor", ".ql-container", "rich-textarea", ".text-input-field"]) {
@@ -396,8 +445,10 @@ export function applyCssOnlyBidiOverrides(hostname: string, anchor: HTMLElement)
   }
 
   const editor = resolveCssOnlyEditor(hostname, anchor);
-  if (editor) ensureCssOnlyEditorStyles(editor, "all");
-  else if (anchor.isContentEditable || anchor instanceof HTMLTextAreaElement) {
+  if (editor && !cssOnlyEditorHinted.has(editor)) {
+    cssOnlyEditorHinted.add(editor);
+    applyBidiStyles(editor, editor.classList.contains("ProseMirror"));
+  } else if (!editor && (anchor.isContentEditable || anchor instanceof HTMLTextAreaElement)) {
     applyBidiStyles(anchor, anchor.isContentEditable);
   }
 }
@@ -457,10 +508,83 @@ function stripMarkersInEditor(editor: HTMLElement): void {
   }
 }
 
+function stripMarkersInSubtree(root: HTMLElement): boolean {
+  let changed = false;
+  const walker = root.ownerDocument.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let n: Node | null;
+  while ((n = walker.nextNode())) {
+    const t = n as Text;
+    const v = t.nodeValue ?? "";
+    const stripped = stripBidiMarkers(v);
+    if (stripped !== v) {
+      t.nodeValue = stripped;
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+function subtreeHasBidiMarkers(root: HTMLElement): boolean {
+  const walker = root.ownerDocument.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let n: Node | null;
+  while ((n = walker.nextNode())) {
+    if (BIDI_MARKER_RE.test((n as Text).nodeValue ?? "")) return true;
+  }
+  return false;
+}
+
+function hintClaudeEditorOnce(editor: HTMLElement): void {
+  if (cssOnlyEditorHinted.has(editor)) return;
+  cssOnlyEditorHinted.add(editor);
+  editor.setAttribute("dir", "auto");
+  editor.style.setProperty("unicode-bidi", "plaintext");
+}
+
+function hintClaudeParagraphOnce(block: HTMLElement): void {
+  if (claudeParagraphHinted.has(block)) return;
+  claudeParagraphHinted.add(block);
+  block.setAttribute("dir", "auto");
+  block.style.setProperty("unicode-bidi", "plaintext");
+}
+
+/** One-time CSS hints when Claude composer is focused — not on every keystroke. */
+export function hintClaudeComposerOnce(editor: HTMLElement): void {
+  hintClaudeEditorOnce(editor);
+  const block = getCaretBlockInEditor(editor);
+  if (block && block !== editor) hintClaudeParagraphOnce(block);
+}
+
+/**
+ * Claude: strip stray bidi markers only (e.g. after paste). Does not change dir while typing.
+ */
+export function maintainClaudeComposerEditor(editor: HTMLElement): void {
+  const block = getCaretBlockInEditor(editor);
+  const target = block && block !== editor ? block : editor;
+
+  if (!subtreeHasBidiMarkers(target)) return;
+
+  const focused =
+    editor === editor.ownerDocument.activeElement ||
+    editor.contains(editor.ownerDocument.activeElement);
+  const logicalCaret = focused ? getCaretLogicalOffsetInBlock(target) : null;
+
+  const changed = stripMarkersInSubtree(target);
+
+  if (changed && logicalCaret !== null) {
+    setCaretLogicalOffsetInBlock(target, logicalCaret);
+  }
+}
+
 export function maintainCssOnlyComposer(
   editor: HTMLElement,
   scope: "caret" | "all" = "caret",
 ): void {
+  const host = typeof location !== "undefined" ? location.hostname : "";
+  if (isClaudeLikeHost(host)) {
+    maintainClaudeComposerEditor(editor);
+    return;
+  }
+
   if (editor instanceof HTMLTextAreaElement) {
     if (!cssOnlyEditorHinted.has(editor)) {
       cssOnlyEditorHinted.add(editor);

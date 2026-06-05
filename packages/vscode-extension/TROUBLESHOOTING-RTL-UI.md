@@ -30,7 +30,7 @@ Use this checklist when **RTL Fixer: Enable RTL UI** does not change the workben
 | Nothing changes after enable | Custom CSS loader not enabled, or window not reloaded |
 | Sidebar RTL but editor flipped | Report a bug — v2 CSS keeps `.monaco-editor` LTR; you may have another CSS import |
 | Notifications still LTR/mirrored | Expected partial fix: notifications use `plaintext` in `rtl-ui.css`; also set `rtlFixer.uiMessageDirection` to `rtl` |
-| AI chat / Composer input wrong order | Reload after update; host DOM changes between releases — see [rtl-ui.css](assets/rtl-ui.css) Cursor/VS Code chat section |
+| AI chat / composer input wrong order | Reload after update; host DOM changes between releases — see [rtl-ui.css](assets/rtl-ui.css) chat section |
 | Quick Open paths reversed | Reload; v2 sets `direction: auto` on quick input fields |
 
 ## Recovery (disable everything)
@@ -41,7 +41,7 @@ Use this checklist when **RTL Fixer: Enable RTL UI** does not change the workben
 
 ## Tested editor builds (best-effort)
 
-CSS selectors are maintained against recent **VS Code 1.90+** and **Cursor** chat/composer DOM. After a major host upgrade, chat rules may need a small selector patch even when the rest of the workbench still works.
+CSS selectors are maintained against recent **VS Code 1.90+** chat and inline AI panel DOM. After a major editor upgrade, chat rules may need a small selector patch even when the rest of the workbench still works.
 
 ## Related
 

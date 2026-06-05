@@ -1,36 +1,56 @@
 {
-  "name": "rtl-text-fixer",
-  "displayName": "RTL Text Fixer",
-  "description": "Fix mixed Persian (RTL) and English (LTR) text readability by inserting Unicode bidi markers.",
-  "version": "0.3.0",
+  "name": "bidi-forge",
+  "displayName": "BIDI · Forge",
+  "description": "Fix mixed Persian, Arabic, and English (RTL/LTR) text in VS Code with Unicode bidi markers—selection, clipboard, and optional RTL UI CSS.",
+  "version": "0.3.2",
   "private": false,
   "type": "module",
   "publisher": "amirmkazemi",
   "icon": "icon.png",
   "license": "MIT",
+  "markdown": "github",
+  "qna": "https://github.com/BIDI-Forge/bidi-forge/discussions",
+  "galleryBanner": {
+    "color": "#0d3b2e",
+    "theme": "dark"
+  },
   "repository": {
     "type": "git",
-    "url": "https://github.com/BIDI-Forge/bidi-forge.git"
+    "url": "https://github.com/BIDI-Forge/bidi-forge.git",
+    "directory": "packages/vscode-extension"
   },
-  "homepage": "https://github.com/BIDI-Forge/bidi-forge",
+  "homepage": "https://github.com/BIDI-Forge/bidi-forge#readme",
   "bugs": {
     "url": "https://github.com/BIDI-Forge/bidi-forge/issues"
   },
   "keywords": [
     "rtl",
+    "ltr",
+    "bidi",
     "persian",
     "farsi",
-    "bidi",
+    "arabic",
+    "hebrew",
     "unicode",
-    "cursor",
-    "vscode"
+    "mixed-script",
+    "multilingual",
+    "accessibility",
+    "formatter",
+    "vscode",
+    "vscodium",
+    "openvsx",
+    "clipboard",
+    "i18n",
+    "markdown",
+    "ai-chat"
   ],
   "engines": {
     "vscode": "^1.90.0"
   },
   "categories": [
     "Other",
-    "Formatters"
+    "Formatters",
+    "Accessibility"
   ],
   "activationEvents": [
     "onCommand:rtlFixer.fixSelectedText",
@@ -99,9 +119,10 @@
     "dev": "node --experimental-strip-types esbuild.config.ts --watch",
     "test": "vitest run",
     "lint": "eslint \"src/**/*.ts\" esbuild.config.ts --ignore-pattern \"src/**/__tests__/**\" --max-warnings=0",
-    "package": "pnpm build && vsce package --no-dependencies",
+    "package": "pnpm build && node scripts/package-vsix.mjs",
     "smoke:vsix": "node ../../scripts/smoke-vsix.mjs",
-    "publish": "pnpm build && vsce publish --no-dependencies"
+    "publish:marketplace": "pnpm package && vsce publish --no-dependencies",
+    "publish:ovsx": "pnpm package && pnpm dlx ovsx publish BIDI-Forge-*.vsix -p \"$OPEN_VSX_TOKEN\""
   },
   "dependencies": {
     "@bidi-forge/core": "workspace:*",

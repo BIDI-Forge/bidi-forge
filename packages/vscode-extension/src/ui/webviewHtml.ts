@@ -69,7 +69,7 @@ export function buildSettingsWebviewHtml(options: SettingsWebviewOptions): strin
   </section>
 
   <section class="section">
-    <h2>محدودیت‌های VS Code / Cursor</h2>
+    <h2>محدودیت‌های VS Code</h2>
     <p class="bidi-isolate" dir="auto">
       افزونه نمی‌تواند کل Workbench را به‌صورت رسمی RTL کند. RTL UI از طریق Custom CSS و فایل
       <span class="ltr-block">rtl-ui.css</span> اعمال می‌شود. ویرایشگر و ترمینال عمداً LTR می‌مانند.

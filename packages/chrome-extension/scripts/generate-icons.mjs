@@ -15,15 +15,6 @@ const TRIM_COLOR = "#f6f8f2";
 
 const sizes = [16, 32, 48, 128];
 
-function hasImageMagickConvert() {
-  try {
-    execSync("command -v convert", { stdio: "ignore" });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 function buildIcon(size, outPath) {
   const resize = `${size}x${size}`;
   const unsharp = size >= 48 ? "-unsharp 0x0.6" : "-unsharp 0x0.9";
@@ -42,11 +33,6 @@ function buildIcon(size, outPath) {
 await mkdir(iconsDir, { recursive: true });
 await mkdir(join(storeDir, "screenshots"), { recursive: true });
 await mkdir(join(storeDir, "promo"), { recursive: true });
-
-if (!hasImageMagickConvert()) {
-  console.log("[icons] ImageMagick convert not found — using committed icons in icons/");
-  process.exit(0);
-}
 
 for (const size of sizes) {
   const out = join(iconsDir, `icon${size}.png`);

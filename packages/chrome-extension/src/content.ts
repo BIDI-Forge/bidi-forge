@@ -7,12 +7,15 @@ import {
 } from "./bidiDomStyles.js";
 import { hookShadowRootsInTree, querySelectorAllDeepFrom } from "./domDeep.js";
 import {
-  applyComposerMarkersOnBlur,
   applyCssOnlyBidiOverrides,
+  hintClaudeComposerOnce,
+  isClaudeLikeHost,
   isCssOnlyComposer,
   isGoogleAiHost,
   isInsideCssOnlyComposer,
+  isInClaudeLiveComposer,
   maintainCssOnlyComposer,
+  maintainClaudeComposerEditor,
   resolveCssOnlyEditor,
 } from "./cssOnlyComposer.js";
 import { shouldPauseComposerDomFix } from "./selectionGuard.js";
@@ -85,7 +88,6 @@ function findMessageRootForNode(node: Node): HTMLElement | null {
   if (root.isContentEditable) return null;
   return root;
 }
-
 
 function isDeleteInputEvent(ev: Event): boolean {
   const inputType = (ev as InputEvent).inputType;
@@ -252,6 +254,11 @@ function applyShadowHostBidiHintsFrom(leaf: HTMLElement): void {
  */
 function applyComposerBidiHintsForSurface(el: HTMLElement): void {
   const host = currentHostname();
+  if (isInClaudeLiveComposer(el, host)) {
+    const ed = resolveCssOnlyEditor(host, el);
+    if (ed) hintClaudeComposerOnce(ed);
+    return;
+  }
   if (isCssOnlyComposer(host, el)) {
     applyCssOnlyBidiOverrides(host, el);
     if (isLikelyGoogleAiSurface(host)) applyShadowHostBidiHintsFrom(el);
@@ -324,8 +331,10 @@ function fixContentEditableRoot(root: HTMLElement, mode: "typing" | "full" = "ty
   if (mode === "typing" && shouldPauseComposerDomFix()) return false;
 
   const host = currentHostname();
+  if (isInClaudeLiveComposer(root, host)) return false;
+
   if (isCssOnlyComposer(host, root)) {
-    applyCssOnlyBidiOverrides(host, root);
+    if (!isClaudeLikeHost(host)) applyCssOnlyBidiOverrides(host, root);
     if (mode === "typing") return false;
     const editor = resolveCssOnlyEditor(host, root);
     if (editor) maintainCssOnlyComposerSafe(editor, root, "all");
@@ -352,6 +361,7 @@ export function fixInputElement(el: Element, mode: "typing" | "full" = "typing")
   if (!enabled) return;
   if (!isEditableElement(el)) return;
   if (isInSkippedContainer(el)) return;
+  if (isInClaudeLiveComposer(el)) return;
 
   if (el instanceof HTMLTextAreaElement) {
     fixTextarea(el);
@@ -365,6 +375,7 @@ export function fixInputElement(el: Element, mode: "typing" | "full" = "typing")
 export function fixTextNode(textNode: Text): void {
   if (!enabled) return;
   if (isInSkippedContainer(textNode)) return;
+  if (isInClaudeLiveComposer(textNode)) return;
   if (isInsideEditable(textNode)) return;
   if (isInsideMessageSurface(textNode)) return;
 
@@ -566,24 +577,17 @@ function flushQueue(): void {
   if (queued.size > 0) scheduleFlush();
 }
 
-function applyComposerMarkersOnBlurFix(el: Element, host: string): void {
-  const editor = resolveCssOnlyEditor(host, el);
-  if (!(editor instanceof HTMLElement)) return;
-  programmaticEdit.add(el);
-  runWithoutMutationFeedback(() => {
-    for (const block of listComposerBlocks(editor)) {
-      tryFixMixedBlockCoalesced(block, { allowInCssOnlyComposer: true });
-    }
-  });
-  programmaticEdit.delete(el);
-}
-
 function wireCssOnlyComposerEditable(el: Element): void {
   if (!(el instanceof HTMLElement)) return;
   const host = currentHostname();
-  applyComposerBidiHintsForSurface(el);
+  const isClaude = isClaudeLikeHost(host);
+
+  if (!isClaude) {
+    applyComposerBidiHintsForSurface(el);
+  }
 
   const editor = resolveCssOnlyEditor(host, el);
+
   const scheduleMaintain = () => {
     if (!enabled) return;
     if (shouldPauseComposerDomFix()) return;
@@ -602,64 +606,85 @@ function wireCssOnlyComposerEditable(el: Element): void {
     scheduledInputFix.set(el, id);
   };
 
-  composerScheduleByEditable.set(el, scheduleMaintain);
+  if (!isClaude) {
+    composerScheduleByEditable.set(el, scheduleMaintain);
+  }
+
   wireComposerDeleteGrace(el);
 
   el.addEventListener("compositionstart", () => composing.set(el, true), { passive: true });
-  el.addEventListener("compositionend", () => {
-    composing.set(el, false);
-    scheduleMaintain();
-  });
-  el.addEventListener("input", scheduleMaintain, { passive: true, capture: true });
   el.addEventListener(
-    "paste",
+    "compositionend",
     () => {
-      window.setTimeout(() => {
-        if (!enabled || programmaticEdit.has(el)) return;
-        const ed = resolveCssOnlyEditor(host, el);
-        if (ed) maintainCssOnlyComposerSafe(ed, el);
-      }, 0);
+      composing.set(el, false);
+      if (!isClaude) scheduleMaintain();
     },
     { passive: true },
   );
+
+  if (!isClaude) {
+    el.addEventListener("input", scheduleMaintain, { passive: true, capture: true });
+  }
+
+  if (!isClaude) {
+    el.addEventListener(
+      "paste",
+      () => {
+        window.setTimeout(() => {
+          if (!enabled || programmaticEdit.has(el)) return;
+          const ed = resolveCssOnlyEditor(host, el);
+          if (ed) maintainCssOnlyComposerSafe(ed, el);
+        }, 0);
+      },
+      { passive: true },
+    );
+  }
+
   el.addEventListener(
     "keydown",
     (ev) => {
+      if (ev.key === "Enter" && isClaude && !ev.shiftKey) {
+        window.setTimeout(() => {
+          if (!enabled || programmaticEdit.has(el)) return;
+          const ed = resolveCssOnlyEditor(host, el);
+          if (ed) hintClaudeComposerOnce(ed);
+        }, 0);
+      }
       if (ev.key !== "Enter") return;
       const grace = ev.shiftKey ? COMPOSER_AFTER_ENTER_GRACE_MS : 300;
       skipComposerFixUntil.set(el, Date.now() + grace);
     },
     { capture: true },
   );
+
   el.addEventListener(
     "focus",
     () => {
       if (!enabled || programmaticEdit.has(el)) return;
       const ed = resolveCssOnlyEditor(host, el);
-      if (ed) maintainCssOnlyComposerSafe(ed, el);
-      else applyCssOnlyBidiOverrides(host, el);
+      if (ed && isClaude) hintClaudeComposerOnce(ed);
     },
     { passive: true },
   );
+
   el.addEventListener(
     "blur",
     () => {
       const prev = scheduledInputFix.get(el);
       if (prev !== undefined) window.clearTimeout(prev);
       scheduledInputFix.delete(el);
-      if (!enabled || programmaticEdit.has(el)) return;
+      if (!isClaude || !enabled || programmaticEdit.has(el)) return;
       const ed = resolveCssOnlyEditor(host, el);
-      if (applyComposerMarkersOnBlur(host)) {
-        applyComposerMarkersOnBlurFix(el, host);
-      } else if (ed) {
-        maintainCssOnlyComposerSafe(ed, el, "all");
-      }
+      if (!ed) return;
+      programmaticEdit.add(el);
+      runWithoutMutationFeedback(() => maintainClaudeComposerEditor(ed));
+      programmaticEdit.delete(el);
     },
     { passive: true },
   );
 
-  if (editor) maintainCssOnlyComposerSafe(editor, el);
-  else applyCssOnlyBidiOverrides(host, el);
+  if (editor && isClaude) hintClaudeComposerOnce(editor);
+  else if (!isClaude) applyCssOnlyBidiOverrides(host, el);
 }
 
 function ensureEditableWired(el: Element): void {
@@ -668,7 +693,11 @@ function ensureEditableWired(el: Element): void {
   if (wiredEditables.has(el)) return;
   wiredEditables.add(el);
 
-  if (isCssOnlyComposer(currentHostname(), el)) {
+  const host = currentHostname();
+  const claudeEditor =
+    isClaudeLikeHost(host) && el instanceof HTMLElement ? resolveCssOnlyEditor(host, el) : null;
+
+  if (isCssOnlyComposer(host, el) || claudeEditor) {
     wireCssOnlyComposerEditable(el);
     return;
   }

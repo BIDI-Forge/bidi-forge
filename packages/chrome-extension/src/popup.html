@@ -32,7 +32,7 @@
           <ul class="hero__pills" aria-label="Highlights">
             <li class="pill pill--claude">Claude-first</li>
             <li class="pill pill--accent">AI presets</li>
-            <li class="pill">Local only</li>
+            <li class="pill pill--local">Local only</li>
           </ul>
         </div>
       </header>
@@ -55,34 +55,6 @@
             <span id="status" class="status__primary">Loading…</span>
             <span id="statusDetail" class="status__secondary"></span>
           </div>
-        </div>
-      </section>
-
-      <section class="card card--scope" aria-label="Site scope">
-        <h2 class="card__label">Where to run</h2>
-        <div class="scope" role="radiogroup" aria-label="Site scope mode">
-          <label class="scope__option">
-            <input type="radio" name="scope" value="presets" />
-            <span>AI chat presets only</span>
-          </label>
-          <label class="scope__option">
-            <input type="radio" name="scope" value="all" />
-            <span>All websites</span>
-          </label>
-        </div>
-      </section>
-
-      <section class="card card--site" aria-label="Current tab">
-        <h2 class="card__label">Current tab</h2>
-        <p class="site__host" id="siteHost">—</p>
-        <p class="site__tier" id="siteTier">—</p>
-        <div class="card__row site__row">
-          <span class="card__sublabel">Fix on this site</span>
-          <label class="toggle" aria-label="Enable on this hostname">
-            <input id="siteEnabled" type="checkbox" checked />
-            <span class="toggle__track"></span>
-            <span class="toggle__thumb"></span>
-          </label>
         </div>
       </section>
 

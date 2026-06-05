@@ -1,6 +1,10 @@
 import { fixMixedText, stripBidiMarkers } from "@bidi-forge/core";
 
-import { isInsideCssOnlyComposer } from "./cssOnlyComposer.js";
+import { isInClaudeLiveComposer, isInsideCssOnlyComposer } from "./cssOnlyComposer.js";
+
+function isUnderClaudeLiveComposerDom(block: HTMLElement): boolean {
+  return isInClaudeLiveComposer(block, "claude.ai") || isInClaudeLiveComposer(block, "anthropic.com");
+}
 
 const PERSIAN_RE = /[\u0600-\u06FF]/;
 const ENGLISH_RE = /[a-zA-Z]/;
@@ -212,6 +216,8 @@ export function tryFixMixedBlockCoalesced(
   if (block.closest("pre")) return false;
   if (block.matches("pre, code, kbd, samp")) return false;
   if (block.querySelector("pre, code, kbd, samp, a[href]")) return false;
+
+  if (isUnderClaudeLiveComposerDom(block)) return false;
 
   const host = typeof location !== "undefined" ? location.hostname : "";
   if (host && isInsideCssOnlyComposer(block, host) && !options?.allowInCssOnlyComposer) {

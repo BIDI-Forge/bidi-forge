@@ -13,7 +13,7 @@ const extDir = new URL("../packages/vscode-extension/", import.meta.url).pathnam
 execSync("pnpm package", { cwd: extDir, stdio: "inherit" });
 
 const vsixFiles = readdirSync(extDir)
-  .filter((f) => f.endsWith(".vsix"))
+  .filter((f) => f.endsWith(".vsix") && f.startsWith("BIDI-Forge-"))
   .sort()
   .reverse();
 if (vsixFiles.length === 0) {
@@ -57,7 +57,16 @@ try {
     process.exit(1);
   }
 
-  console.log(`smoke-vsix: OK (${vsixFiles[0]}, ${commands.length} commands)`);
+  if (pkg.publisher !== "amirmkazemi" || pkg.name !== "bidi-forge") {
+    console.error(
+      `smoke-vsix: expected amirmkazemi.bidi-forge, got ${pkg.publisher}.${pkg.name}`,
+    );
+    process.exit(1);
+  }
+
+  console.log(
+    `smoke-vsix: OK (${vsixFiles[0]}, ${pkg.publisher}.${pkg.name}, ${commands.length} commands)`,
+  );
 } finally {
   rmSync(extractDir, { recursive: true, force: true });
 }
