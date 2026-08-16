@@ -1,4 +1,4 @@
-import { hostMatchesPattern, matchesAnyHost } from "./hostUtils.js";
+import { matchesAnyHost } from "./hostUtils.js";
 import type { SiteAdapter } from "./types.js";
 
 export function isGrokHost(hostname: string): boolean {

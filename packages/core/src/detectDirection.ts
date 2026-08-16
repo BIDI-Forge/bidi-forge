@@ -1,9 +1,30 @@
 import type { ParagraphDirection } from "@rtl-text-fixer/shared";
 import { getCharClass, type CharClass } from "./languageDetector.js";
+import { LRM, RLM } from "./isolates.js";
+import { findAtomicLtrSpans } from "./runs.js";
 import { iterateGraphemes } from "./segments.js";
 
 function isWeakLeadingCharClass(cc: CharClass): boolean {
   return cc === "SPACE" || cc === "PUNCT" || cc === "NUMBER" || cc === "OTHER";
+}
+
+/**
+ * Blank out `code`/URL/email/path runs before deciding a paragraph direction.
+ * A Persian sentence that merely *starts* with `` `npm install` `` is still a Persian
+ * sentence; without masking, the technical run wins and the whole line flips to LTR.
+ */
+export function maskAtomicLtrSpans(text: string): string {
+  const spans = findAtomicLtrSpans(text);
+  if (spans.length === 0) return text;
+
+  let out = "";
+  let cursor = 0;
+  for (const span of spans) {
+    out += text.slice(cursor, span.start);
+    out += " ".repeat(span.end - span.start);
+    cursor = span.end;
+  }
+  return out + text.slice(cursor);
 }
 
 function indexOfFirstRtlChar(text: string): number {
@@ -40,13 +61,15 @@ export function isRtlFirstMixedLine(text: string): boolean {
  * Detect dominant paragraph direction from strong characters.
  */
 export function detectParagraphDirection(text: string): ParagraphDirection {
-  if (isEnglishFirstMixedLine(text)) return "ltr";
-  if (isRtlFirstMixedLine(text)) return "rtl";
+  const prose = maskAtomicLtrSpans(text);
+
+  if (isEnglishFirstMixedLine(prose)) return "ltr";
+  if (isRtlFirstMixedLine(prose)) return "rtl";
 
   let rtl = 0;
   let ltr = 0;
 
-  for (const ch of text) {
+  for (const ch of prose) {
     const cc = getCharClass(ch);
     if (cc === "RTL") rtl++;
     else if (cc === "LTR") ltr++;
@@ -56,7 +79,7 @@ export function detectParagraphDirection(text: string): ParagraphDirection {
   if (rtl > ltr) return "rtl";
   if (ltr > rtl) return "ltr";
 
-  const firstStrong = detectFirstStrongDirection(text);
+  const firstStrong = detectFirstStrongDirection(prose);
   if (firstStrong === "rtl" || firstStrong === "ltr") return firstStrong;
   return "neutral";
 }
@@ -104,6 +127,44 @@ export function needsLeadingRlmForRtlParagraph(
     if (isWeakLeadingCharClass(cc)) sawWeakLeading = true;
   }
   return false;
+}
+
+/** True when weak characters (bullet, list number, emoji, quote) precede the first strong one. */
+export function hasWeakLeadingRun(text: string): boolean {
+  let sawWeakLeading = false;
+  for (const g of iterateGraphemes(text)) {
+    const cc = getCharClass(g);
+    if (cc === "RTL" || cc === "LTR") return sawWeakLeading;
+    if (isWeakLeadingCharClass(cc)) sawWeakLeading = true;
+  }
+  return false;
+}
+
+/**
+ * Marker to prepend so the renderer resolves the *same* base direction we tokenized for.
+ *
+ * `dir="auto"` and the Unicode BiDi algorithm both anchor on the first strong character, so a
+ * Persian line that opens with `` `code` ``, an English term, a bullet, or a list number would
+ * otherwise render LTR (misplaced bullets, punctuation jumping sides). A leading RLM/LRM is a
+ * strong character of the intended direction, which pins the paragraph without changing the text.
+ */
+export function leadingBidiMarkerFor(
+  text: string,
+  paragraphDirection: ParagraphDirection,
+): string {
+  if (paragraphDirection === "neutral") return "";
+  if (!text) return "";
+
+  const firstStrong = detectFirstStrongDirection(text);
+
+  if (paragraphDirection === "rtl") {
+    if (!hasRtlStrong(text)) return "";
+    return firstStrong !== "rtl" || hasWeakLeadingRun(text) ? RLM : "";
+  }
+
+  // Pure LTR text never needs pinning — leave English-only lines untouched.
+  if (!hasRtlStrong(text)) return "";
+  return firstStrong !== "ltr" || hasWeakLeadingRun(text) ? LRM : "";
 }
 
 /**

@@ -30,6 +30,11 @@ export default [
       ...tsPlugin.configs["recommended-type-checked"].rules,
       ...tsPlugin.configs["stylistic-type-checked"].rules,
       "no-console": "off",
+      // `_name` is the repo's convention for a parameter kept for API shape but unused.
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" },
+      ],
       "@typescript-eslint/no-misused-promises": [
         "error",
         {
@@ -46,6 +51,14 @@ export default [
       globals: {
         ...globals.browser,
         ...globals.webextensions,
+      },
+    },
+  },
+  {
+    files: ["packages/cli/src/**/*.ts", "**/scripts/**/*.mjs"],
+    languageOptions: {
+      globals: {
+        ...globals.node,
       },
     },
   },

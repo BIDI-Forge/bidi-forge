@@ -10,12 +10,17 @@ const ALL_MARKERS_RE = /[\u200E\u200F\u2066-\u2069]/g;
 
 const LEGACY_EMBEDDING_RE = /[\u202A-\u202E]/g;
 
+/** Non-global twins: `RegExp.test` on a `/g` regex advances `lastIndex` and alternates results. */
+const HAS_MARKER_RE = /[\u200E\u200F\u2066-\u2069]/;
+
+const HAS_LEGACY_EMBEDDING_RE = /[\u202A-\u202E]/;
+
 export function hasBidiMarkers(value: string): boolean {
-  return ALL_MARKERS_RE.test(value);
+  return HAS_MARKER_RE.test(value);
 }
 
 export function hasLegacyEmbedding(value: string): boolean {
-  return LEGACY_EMBEDDING_RE.test(value);
+  return HAS_LEGACY_EMBEDDING_RE.test(value);
 }
 
 export function wrapLrm(value: string): string {

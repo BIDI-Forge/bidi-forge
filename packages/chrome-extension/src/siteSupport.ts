@@ -1,4 +1,4 @@
-import { getAdapterForHost, getSupportTier, resolveAdapter } from "./adapters/registry.js";
+import { getSupportTier, resolveAdapter } from "./adapters/registry.js";
 import type { SupportTier } from "./adapters/types.js";
 import {
   computeEffectiveEnabled,
@@ -45,8 +45,6 @@ export function buildTabSiteStatus(
   } else {
     effectiveEnabled = computeEffectiveEnabled(true, hostname, site);
   }
-
-  const meta = adapter ?? getAdapterForHost(hostname, pathname);
 
   return {
     hostname,

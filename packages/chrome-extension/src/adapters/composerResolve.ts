@@ -22,7 +22,7 @@ export function resolveAdapterComposerEditor(
   pathname = "",
 ): HTMLElement | null {
   const adapter = resolveAdapter(hostname, pathname);
-  if (!adapter || adapter.supportTier !== "css-only") return null;
+  if (adapter?.supportTier !== "css-only") return null;
   if (adapter.id === "gemini") return null;
 
   for (const sel of PROSE_EDITABLE_SELECTORS) {

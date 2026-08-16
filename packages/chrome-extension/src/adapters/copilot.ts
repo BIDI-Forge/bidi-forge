@@ -1,7 +1,7 @@
 import { matchesAnyHost } from "./hostUtils.js";
 import type { SiteAdapter } from "./types.js";
 
-export function isCopilotHost(hostname: string, pathname = ""): boolean {
+export function isCopilotHost(hostname: string, _pathname = ""): boolean {
   const h = hostname.toLowerCase();
   if (matchesAnyHost(hostname, ["copilot.microsoft.com", "copilot.cloud.microsoft", "m365.cloud.microsoft", "bing.com"])) {
     return true;

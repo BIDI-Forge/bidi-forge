@@ -1,4 +1,4 @@
-import { hostMatchesPattern, matchesAnyHost } from "./hostUtils.js";
+import { hostMatchesPattern } from "./hostUtils.js";
 import type { SiteAdapter } from "./types.js";
 
 export function isGeminiHost(hostname: string): boolean {

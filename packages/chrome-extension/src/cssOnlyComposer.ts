@@ -15,6 +15,7 @@ import {
   applyBlockBidiStyles,
   applyListContainerBidiStyles,
   applyListItemBidiStyles,
+  markComposerRoot,
   BIDI_COMPOSER_BLOCK_SELECTOR,
   BIDI_LIST_SELECTOR,
 } from "./bidiDomStyles.js";
@@ -340,7 +341,7 @@ export function isCssOnlyComposer(hostname: string, el: Element): boolean {
 }
 
 /** Claude: CSS-only in composer — no Unicode markers (they break ProseMirror typing). */
-export function applyComposerMarkersOnBlur(hostname: string): boolean {
+export function applyComposerMarkersOnBlur(_hostname: string): boolean {
   return false;
 }
 
@@ -383,7 +384,6 @@ function getCaretBlockInEditor(editor: HTMLElement): HTMLElement | null {
 
 const geminiDirObservers = new WeakMap<HTMLElement, MutationObserver>();
 const cssOnlyEditorHinted = new WeakSet<HTMLElement>();
-const claudeParagraphHinted = new WeakSet<HTMLElement>();
 
 function syncBlockBidiStyles(block: HTMLElement): void {
   block.classList.remove("ql-direction-rtl", "ql-direction-ltr");
@@ -463,6 +463,7 @@ export function applyGeminiQuillBidiOverrides(anchor: HTMLElement): void {
 
 function applyBidiStyles(el: HTMLElement, proseMirrorEditor = false): void {
   applyBlockBidiStyles(el);
+  markComposerRoot(el);
   if (proseMirrorEditor) {
     el.style.removeProperty("direction");
   }
@@ -534,24 +535,25 @@ function subtreeHasBidiMarkers(root: HTMLElement): boolean {
 }
 
 function hintClaudeEditorOnce(editor: HTMLElement): void {
+  // The class is re-checked every call: ProseMirror re-renders can drop it, and the editor
+  // root is the one node whose attribute changes ProseMirror ignores.
+  markComposerRoot(editor);
   if (cssOnlyEditorHinted.has(editor)) return;
   cssOnlyEditorHinted.add(editor);
   editor.setAttribute("dir", "auto");
   editor.style.setProperty("unicode-bidi", "plaintext");
 }
 
-function hintClaudeParagraphOnce(block: HTMLElement): void {
-  if (claudeParagraphHinted.has(block)) return;
-  claudeParagraphHinted.add(block);
-  block.setAttribute("dir", "auto");
-  block.style.setProperty("unicode-bidi", "plaintext");
-}
-
-/** One-time CSS hints when Claude composer is focused — not on every keystroke. */
+/**
+ * CSS hints for the Claude composer.
+ *
+ * Only the editor root is touched — paragraphs, list items, and lists inside are styled by
+ * `content.css` (`unicode-bidi: plaintext` per block, markers `inside` so they follow each
+ * line's own direction). Writing attributes on inner ProseMirror nodes makes it redraw them
+ * and drop the hint, which is why the per-paragraph write was removed.
+ */
 export function hintClaudeComposerOnce(editor: HTMLElement): void {
   hintClaudeEditorOnce(editor);
-  const block = getCaretBlockInEditor(editor);
-  if (block && block !== editor) hintClaudeParagraphOnce(block);
 }
 
 /**

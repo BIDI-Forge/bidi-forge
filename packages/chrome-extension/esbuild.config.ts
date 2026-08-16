@@ -40,11 +40,12 @@ async function copyStatic(): Promise<void> {
   await ensureOutDir();
   await copyFile("src/popup.html", join(outdir, "popup.html"));
   await copyFile("src/popup.css", join(outdir, "popup.css"));
+  await copyFile("src/content.css", join(outdir, "content.css"));
   await copyIcons();
 
   const manifestRaw = await readFile("src/manifest.json", "utf8");
   const manifest = JSON.parse(manifestRaw) as Record<string, unknown>;
-  const contentScripts = manifest.content_scripts as Array<Record<string, unknown>> | undefined;
+  const contentScripts = manifest.content_scripts as Record<string, unknown>[] | undefined;
   if (contentScripts?.[0]) {
     contentScripts[0].matches = presetHostMatchPatterns();
   }
@@ -103,7 +104,7 @@ if (isWatch) {
   await ctx.watch();
 
   // Copy static assets on change (popup + manifest).
-  const staticFiles = ["src/popup.html", "src/popup.css", "src/manifest.json"];
+  const staticFiles = ["src/popup.html", "src/popup.css", "src/content.css", "src/manifest.json"];
   for (const file of staticFiles) {
     watch(file, { persistent: true }, () => {
       void copyStatic();

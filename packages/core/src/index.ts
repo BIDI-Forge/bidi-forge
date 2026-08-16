@@ -17,6 +17,9 @@ export {
   needsLeadingRlmForRtlParagraph,
   needsLeadingLrmForLtrMixedParagraph,
   isEnglishFirstMixedLine,
+  leadingBidiMarkerFor,
+  hasWeakLeadingRun,
+  maskAtomicLtrSpans,
   hasRtlStrong,
   hasLtrStrong,
 } from "./detectDirection.js";
@@ -29,12 +32,30 @@ import { normalizeText } from "./normalize.js";
 import { stripBidiMarkers } from "./isolates.js";
 import { tokenizeNormalized } from "./tokenizer.js";
 import { applyBidiMarkers } from "./bidiFixer.js";
-import {
-  detectParagraphDirection,
-  needsLeadingLrmForLtrMixedParagraph,
-  needsLeadingRlmForRtlParagraph,
-} from "./detectDirection.js";
-import { LRM, RLM } from "./isolates.js";
+import { detectParagraphDirection, leadingBidiMarkerFor } from "./detectDirection.js";
+
+const LINE_SPLIT_RE = /(\r\n|\n|\r)/;
+const CODE_FENCE_RE = /^\s{0,3}(?:```|~~~)/;
+
+/** One rendered line = one BiDi paragraph, so direction is resolved per line. */
+function fixLine(line: string, mode: "legacy" | "enhanced", stripMarkers: boolean): string {
+  if (!line) return line;
+
+  const tokens = tokenizeNormalized(line, false);
+  const paragraphDirection = detectParagraphDirection(line);
+  const fixed = applyBidiMarkers(tokens, {
+    mode,
+    stripExistingMarkers: stripMarkers,
+    paragraphDirection,
+  });
+
+  const output = fixed.map((t) => t.value).join("");
+  if (mode === "legacy") return output;
+
+  const leading = leadingBidiMarkerFor(line, paragraphDirection);
+  if (!leading || output.startsWith(leading)) return output;
+  return leading + output;
+}
 
 export function fixMixedText(text: string, options?: FixMixedTextOptions): string {
   const mode = options?.mode ?? "enhanced";
@@ -43,21 +64,19 @@ export function fixMixedText(text: string, options?: FixMixedTextOptions): strin
 
   const normalized = normalizeText(text);
   const prepared = stripMarkers ? stripBidiMarkers(normalized) : normalized;
-  const tokens = tokenizeNormalized(prepared, false);
-  const paragraphDirection = detectParagraphDirection(prepared);
-  const fixed = applyBidiMarkers(tokens, {
-    mode,
-    stripExistingMarkers: stripMarkers,
-    paragraphDirection,
-  });
-  let output = fixed.map((t) => t.value).join("");
-  if (needsLeadingRlmForRtlParagraph(prepared, paragraphDirection) && !output.startsWith(RLM)) {
-    output = RLM + output;
-  } else if (
-    needsLeadingLrmForLtrMixedParagraph(prepared, paragraphDirection) &&
-    !output.startsWith(LRM)
-  ) {
-    output = LRM + output;
-  }
-  return output;
+
+  let inFence = false;
+  return prepared
+    .split(LINE_SPLIT_RE)
+    .map((part, i) => {
+      // Odd indices are the captured line separators.
+      if (i % 2 === 1) return part;
+      if (CODE_FENCE_RE.test(part)) {
+        inFence = !inFence;
+        return part;
+      }
+      if (inFence) return part;
+      return fixLine(part, mode, stripMarkers);
+    })
+    .join("");
 }

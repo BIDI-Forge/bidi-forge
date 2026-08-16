@@ -3,7 +3,8 @@ import { fixMixedText, stripBidiMarkers as stripBidiMarkersCore } from "@bidi-fo
 import { tryFixMixedBlockCoalesced } from "./blockFix.js";
 import {
   applyBlockBidiStyles,
-  applyBidiStylesToSubtree,
+  markComposerRoot,
+  unmarkComposerRoots,
 } from "./bidiDomStyles.js";
 import { hookShadowRootsInTree, querySelectorAllDeepFrom } from "./domDeep.js";
 import {
@@ -21,6 +22,8 @@ import {
 import { shouldPauseComposerDomFix } from "./selectionGuard.js";
 import { listComposerBlocks } from "./bidiDomStyles.js";
 import {
+  clearReaderBidi,
+  getMessageRootSelectors,
   scanMessageRoot,
   scanMessageSurfaces,
   scanMessageSurfacesFromElement,
@@ -69,12 +72,32 @@ function isInsideEditable(node: Node): boolean {
   return Boolean(editable);
 }
 
-const MESSAGE_SURFACE_SELECTOR =
+const GENERIC_MESSAGE_SURFACE_SELECTOR =
   '.ProseMirror:not([contenteditable="true"]):not(#prompt-textarea), [data-message-author-role], .markdown, .message-content, .standard-markdown';
+
+let messageSurfaceSelectorCache: { key: string; selector: string } | undefined;
+
+/**
+ * Every rendered-message container, including the ones the site adapter knows about
+ * (`[data-testid="assistant-message"]` on Claude). Text inside these belongs to the
+ * attribute-only reader pass — the marker-based text fix must never touch it.
+ */
+function messageSurfaceSelector(): string {
+  const host = currentHostname();
+  const path = currentPathname();
+  const key = `${host}|${path}`;
+  if (messageSurfaceSelectorCache?.key === key) return messageSurfaceSelectorCache.selector;
+
+  const selector = [GENERIC_MESSAGE_SURFACE_SELECTOR, ...getMessageRootSelectors(host, path)].join(
+    ", ",
+  );
+  messageSurfaceSelectorCache = { key, selector };
+  return selector;
+}
 
 function isInsideMessageSurface(node: Node): boolean {
   const el = closestElement(node);
-  return Boolean(el?.closest(MESSAGE_SURFACE_SELECTOR));
+  return Boolean(el?.closest(messageSurfaceSelector()));
 }
 
 function findMessageRootForNode(node: Node): HTMLElement | null {
@@ -82,7 +105,7 @@ function findMessageRootForNode(node: Node): HTMLElement | null {
   if (!el) return null;
   const host = currentHostname();
   if (isInsideCssOnlyComposer(el, host)) return null;
-  const root = el.closest(MESSAGE_SURFACE_SELECTOR);
+  const root = el.closest(messageSurfaceSelector());
   if (!(root instanceof HTMLElement)) return null;
   if (isInsideCssOnlyComposer(root, host)) return null;
   if (root.isContentEditable) return null;
@@ -218,10 +241,13 @@ const shadowBidiHintsApplied = new WeakSet<HTMLElement>();
 function applyComposerBidiHint(host: HTMLElement): void {
   const ok =
     host instanceof HTMLTextAreaElement || (host instanceof HTMLElement && host.isContentEditable);
-  if (!ok || bidiHintsApplied.has(host)) return;
+  if (!ok) return;
+  // Blocks inside are styled by `content.css` via this class, so nothing else is written into
+  // the editable subtree.
+  markComposerRoot(host);
+  if (bidiHintsApplied.has(host)) return;
   bidiHintsApplied.add(host);
   applyBlockBidiStyles(host);
-  if (host.isContentEditable) applyBidiStylesToSubtree(host);
 }
 
 function isLikelyGoogleAiSurface(hostname: string): boolean {
@@ -818,7 +844,7 @@ function handleDomMutations(mutations: MutationRecord[]): void {
           const el = added as Element;
           scheduleWireEditablesFrom(el);
           scheduleShadowRootsHook(el);
-          if (el.matches(MESSAGE_SURFACE_SELECTOR) && el instanceof HTMLElement) {
+          if (el.matches(messageSurfaceSelector()) && el instanceof HTMLElement) {
             if (!isInsideCssOnlyComposer(el, currentHostname()) && !el.isContentEditable) {
               scheduleMessageRootScan(el);
             }
@@ -933,6 +959,11 @@ function applyEnabled(next: boolean): void {
 
   if (!enabled) {
     stopObservers();
+    // Direction hints are attributes/classes, so turning the extension off restores the site.
+    if (document.body) {
+      clearReaderBidi(document.body);
+      unmarkComposerRoots(document.body);
+    }
     return;
   }
 

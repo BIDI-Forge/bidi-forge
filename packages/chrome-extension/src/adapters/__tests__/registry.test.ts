@@ -30,6 +30,14 @@ describe("adapter registry", () => {
     expect(resolveAdapter("x.com", "/i/grok")?.id).toBe("grok");
   });
 
+  it("returns Claude message roots, so content.ts routes them to the reader pass", () => {
+    // content.ts builds its message-surface selector from these; anything missing here would
+    // be treated as ordinary page text and get bidi markers written into it.
+    const roots = getMessageRootSelectors("claude.ai", "/chat/1");
+    expect(roots).toContain('[data-testid="assistant-message"]');
+    expect(roots).toContain('[data-testid="user-message"]');
+  });
+
   it("returns message roots for Copilot", () => {
     const roots = getMessageRootSelectors("copilot.microsoft.com");
     expect(roots.some((s) => s.includes("ai-message") || s.includes("chat-message"))).toBe(

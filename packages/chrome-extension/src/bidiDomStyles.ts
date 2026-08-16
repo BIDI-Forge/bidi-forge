@@ -7,10 +7,23 @@ export const BIDI_LIST_SELECTOR = "ol, ul";
 
 export const BIDI_COMPOSER_BLOCK_SELECTOR = "p, li:not(:has(p))";
 
+/** Marks a live composer so `content.css` can style its blocks without touching the DOM inside. */
+export const BIDI_COMPOSER_CLASS = "bf-composer";
+
+export function markComposerRoot(el: HTMLElement): void {
+  if (!el.classList.contains(BIDI_COMPOSER_CLASS)) el.classList.add(BIDI_COMPOSER_CLASS);
+}
+
+export function unmarkComposerRoots(scope: ParentNode): void {
+  for (const el of Array.from(scope.querySelectorAll<HTMLElement>(`.${BIDI_COMPOSER_CLASS}`))) {
+    el.classList.remove(BIDI_COMPOSER_CLASS);
+  }
+}
+
 export function applyBlockBidiStyles(el: HTMLElement): void {
   el.setAttribute("dir", "auto");
+  // `direction` has no `auto` value — the `dir` attribute above is what resolves it.
   el.style.setProperty("unicode-bidi", "plaintext", "important");
-  el.style.setProperty("direction", "auto", "important");
   el.style.setProperty("text-align", "start", "important");
 }
 

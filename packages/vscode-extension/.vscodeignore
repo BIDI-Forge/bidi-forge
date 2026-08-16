@@ -8,4 +8,6 @@
 pnpm-lock.yaml
 **/*.vsix
 PUBLISHING.md
+**/scripts/**
+**/store/**
 

@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { fixMixedText, stripBidiMarkers, LRI, PDI, LRM } from "../index.js";
+import { fixMixedText, hasBidiMarkers, stripBidiMarkers, LRI, PDI, LRM } from "../index.js";
+
+describe("hasBidiMarkers", () => {
+  it("gives the same answer on repeated calls", () => {
+    const value = `${LRM}React${LRM}`;
+    expect([1, 2, 3, 4].map(() => hasBidiMarkers(value))).toEqual([true, true, true, true]);
+  });
+});
 
 describe("bidi edge cases (URLs, emails, emoji)", () => {
   it("isolates email in RTL sentence", () => {

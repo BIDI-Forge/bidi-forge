@@ -18,9 +18,10 @@ describe("fixMixedText", () => {
     expect(fixMixedText("سلام hello دنیا")).toBe(`سلام ${LRM}hello${LRM} دنیا`);
   });
 
-  it("wraps LTR segments in mixed sentence", () => {
+  it("wraps LTR segments in mixed sentence and pins the RTL base direction", () => {
+    // Leading RLM: without it `dir=auto` anchors on "React" and flips the Persian sentence to LTR.
     expect(fixMixedText("React در JS خیلی محبوب است")).toBe(
-      `${LRM}React${LRM} در ${LRM}JS${LRM} خیلی محبوب است`,
+      `${RLM}${LRM}React${LRM} در ${LRM}JS${LRM} خیلی محبوب است`,
     );
   });
 
@@ -122,6 +123,53 @@ describe("fixMixedText", () => {
     expect(detectParagraphDirection(input)).toBe("rtl");
     expect(fixMixedText(input).startsWith(RLM)).toBe(true);
     expect(stripBidiMarkers(fixMixedText(input))).toBe(input);
+  });
+
+  it("pins RTL lines that open with code, a bullet, a number, or an English term", () => {
+    const cases = [
+      "`useState` را در React استفاده کنید",
+      "1. `npm install` را اجرا کنید",
+      "- `useState` را صدا بزن",
+      "• نکته مهم درباره React است",
+      "(توضیح) React خوب است",
+      "React در JS خیلی محبوب است",
+      "https://example.com را باز کن و ادامه بده",
+    ];
+
+    for (const input of cases) {
+      expect(detectParagraphDirection(input), input).toBe("rtl");
+      const output = fixMixedText(input);
+      expect(output.startsWith(RLM), `expected leading RLM for ${input}`).toBe(true);
+      expect(stripBidiMarkers(output)).toBe(input);
+      expect(fixMixedText(output)).toBe(output);
+    }
+  });
+
+  it("never marks lines that have no RTL text", () => {
+    for (const input of ["1. Deploy to prod", "Hello world", "- run `npm test`"]) {
+      expect(fixMixedText(input), input).toBe(input);
+    }
+  });
+
+  it("resolves direction per line instead of per block", () => {
+    const input = "Here is the plan:\n1. Deploy to prod\n2. بررسی لاگ‌ها";
+    const output = fixMixedText(input);
+    const lines = output.split("\n");
+
+    expect(lines[0]).toBe("Here is the plan:");
+    expect(lines[1]).toBe("1. Deploy to prod");
+    expect(lines[2]!.startsWith(RLM)).toBe(true);
+    expect(stripBidiMarkers(output)).toBe(input);
+    expect(fixMixedText(output)).toBe(output);
+  });
+
+  it("leaves fenced code blocks untouched", () => {
+    const input = "توضیح کد:\n```ts\nconst first = 1; // مقدار\n```\nپایان توضیح";
+    const output = fixMixedText(input);
+
+    expect(output).toContain("\nconst first = 1; // مقدار\n");
+    expect(stripBidiMarkers(output)).toBe(input);
+    expect(fixMixedText(output)).toBe(output);
   });
 
   it("classifies Persian list digits as numbers not RTL letters", () => {

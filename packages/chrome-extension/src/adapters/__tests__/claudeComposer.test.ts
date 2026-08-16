@@ -45,9 +45,14 @@ describe("Claude composer strategy", () => {
 
     hintClaudeComposerOnce(prose);
     expect(prose.getAttribute("dir")).toBe("auto");
-    expect(para.getAttribute("dir")).toBe("auto");
     expect(prose.style.getPropertyValue("unicode-bidi")).toBe("plaintext");
     expect(prose.style.getPropertyPriority("unicode-bidi")).not.toBe("important");
+
+    // Paragraphs are styled by content.css through this class; writing attributes on inner
+    // ProseMirror nodes makes it redraw them and drop the hint.
+    expect(prose.classList.contains("bf-composer")).toBe(true);
+    expect(para.getAttribute("dir")).toBeNull();
+    expect(para.getAttribute("style")).toBeNull();
 
     expect(para.closest('[data-testid="chat-input"]')).toBe(prose);
     expect(isInClaudeLiveComposer(para, "claude.ai")).toBe(true);

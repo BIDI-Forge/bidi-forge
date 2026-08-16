@@ -1,140 +1,69 @@
 /**
  * Read-only chat message surfaces (Claude assistant replies, etc.).
  * Composers are handled in content.ts; this module fixes rendered markdown/ProseMirror output.
+ *
+ * The fix is attribute-only (see readerBidi.ts). Earlier versions rewrote the text nodes to
+ * inject LRM/RLM, which duplicated the content of inline `<code>`/`<a>` elements and leaked
+ * invisible markers into anything the user copied.
  */
 
-import { fixMixedText, stripBidiMarkers } from "@bidi-forge/core";
-
-import { fixBlockCoalescedTextNodes, shouldFixMixedText } from "./blockFix.js";
 import {
-  applyBlockBidiStyles,
-  applyListContainerBidiStyles,
-  applyListItemBidiStyles,
-  BIDI_BLOCK_SELECTOR,
-  BIDI_LIST_SELECTOR,
-} from "./bidiDomStyles.js";
+  applyReaderBidi,
+  BF_ROLE_ATTR,
+  clearReaderBidi,
+} from "./readerBidi.js";
 import { querySelectorAllDeepFrom } from "./domDeep.js";
 import { getMessageRootSelectors as getAdapterMessageRoots } from "./adapters/registry.js";
-import { isInClaudeLiveComposer, isInsideCssOnlyComposer } from "./cssOnlyComposer.js";
+import { isInsideCssOnlyComposer } from "./cssOnlyComposer.js";
 
 const EDITABLE_SELECTOR =
   '[contenteditable="true"],textarea,[role="textbox"][contenteditable="true"]';
 
-const MESSAGE_BLOCK_SELECTOR = BIDI_BLOCK_SELECTOR;
-
-const hintedRoots = new WeakSet<HTMLElement>();
 const lastRootSignature = new WeakMap<HTMLElement, string>();
 
 export { isChatGptHost, isClaudeLikeHost } from "./adapters/hosts.js";
+export { clearReaderBidi };
 
 export function getMessageRootSelectors(hostname: string, pathname = ""): string[] {
   return getAdapterMessageRoots(hostname, pathname);
-}
-
-function shouldFixText(text: string): boolean {
-  return shouldFixMixedText(text);
 }
 
 function isInsideEditable(el: Element): boolean {
   return Boolean(el.closest(EDITABLE_SELECTOR));
 }
 
-function applyReaderBidiStack(root: HTMLElement): void {
-  applyBlockBidiStyles(root);
-
-  for (const el of root.querySelectorAll(`${MESSAGE_BLOCK_SELECTOR}, table, .markdown, .prose`)) {
-    if (!(el instanceof HTMLElement)) continue;
-    if (el.tagName === "LI") continue;
-    applyBlockBidiStyles(el);
-  }
-
-  for (const list of root.querySelectorAll(BIDI_LIST_SELECTOR)) {
-    if (!(list instanceof HTMLElement)) continue;
-    list.setAttribute("dir", "auto");
-    list.style.setProperty("unicode-bidi", "plaintext");
-    list.style.setProperty("direction", "auto");
-  }
-
-  for (const li of root.querySelectorAll(`${BIDI_LIST_SELECTOR} > li`)) {
-    if (li instanceof HTMLElement) applyListItemBidiStyles(li);
-  }
-
-  for (const code of root.querySelectorAll("pre, code")) {
-    if (code instanceof HTMLElement) {
-      code.setAttribute("dir", "ltr");
-      code.style.setProperty("direction", "ltr", "important");
-      code.style.setProperty("unicode-bidi", "embed", "important");
-      code.style.setProperty("text-align", "left", "important");
-    }
-  }
+/**
+ * Cheap change detector. Content length covers streaming appends; the role probe catches
+ * re-renders that dropped our attributes while the text stayed the same.
+ */
+function rootSignature(root: HTMLElement): string {
+  const text = root.textContent ?? "";
+  const hinted = root.querySelector(`[${BF_ROLE_ATTR}]`) ? "1" : "0";
+  return `${hinted}|${text.length}|${text}`;
 }
 
-function fixReadOnlyBlock(block: HTMLElement): boolean {
-  if (isInClaudeLiveComposer(block)) return false;
-  if (block.closest("pre")) return false;
-  if (block.matches("pre, code, kbd, samp")) return false;
-  if (block.querySelector("pre")) return false;
-
-  const raw = stripBidiMarkers(block.textContent ?? "");
-  if (!raw.trim() || !shouldFixText(raw)) return false;
-
-  const fixed = fixMixedText(raw);
-  if (fixed === raw) return false;
-
-  if (block.childElementCount === 0) {
-    block.textContent = fixed;
-    return true;
-  }
-
-  return fixBlockCoalescedTextNodes(block, fixed);
-}
-
-function isStillStreaming(root: HTMLElement): boolean {
-  if (root.closest('[data-is-streaming="true"]')) return true;
-  if (root.matches(".result-streaming, .streaming")) return true;
-  if (root.querySelector(".result-streaming, .streaming")) return true;
-  const busy = root.closest('[aria-busy="true"]');
-  return busy instanceof HTMLElement;
+function isSkippedRoot(root: HTMLElement, hostname: string): boolean {
+  if (isInsideEditable(root)) return true;
+  if (root.isContentEditable) return true;
+  if (isInsideCssOnlyComposer(root, hostname)) return true;
+  if (root.id === "prompt-textarea") return true;
+  if (root.closest("#prompt-textarea")) return true;
+  return Boolean(root.closest("rich-textarea, .ql-container, .ql-editor"));
 }
 
 /** Fix read-only message container (call inside mutation-suppress guard). */
 export function scanMessageRoot(root: HTMLElement, hostname: string): void {
-  if (isInsideEditable(root)) return;
-  if (isInsideCssOnlyComposer(root, hostname)) return;
-  if (root.id === "prompt-textarea") return;
-  if (root.closest("#prompt-textarea")) return;
-  if (root.closest("rich-textarea, .ql-container, .ql-editor")) return;
-  if (isStillStreaming(root)) return;
+  if (isSkippedRoot(root, hostname)) return;
 
-  if (!hintedRoots.has(root)) {
-    applyReaderBidiStack(root);
-    hintedRoots.add(root);
-  }
-
-  const signature = stripBidiMarkers(root.textContent ?? "");
+  const signature = rootSignature(root);
   if (lastRootSignature.get(root) === signature) return;
 
-  for (const block of root.querySelectorAll(MESSAGE_BLOCK_SELECTOR)) {
-    if (!(block instanceof HTMLElement)) continue;
-    if (block.tagName === "LI") continue;
-    if (isInsideEditable(block)) continue;
-    if (isInsideCssOnlyComposer(block, hostname)) continue;
-    if (block.closest("#prompt-textarea")) continue;
-    fixReadOnlyBlock(block);
-  }
-
-  for (const block of root.querySelectorAll("li > p")) {
-    if (!(block instanceof HTMLElement)) continue;
-    if (isInsideEditable(block)) continue;
-    if (isInsideCssOnlyComposer(block, hostname)) continue;
-    fixReadOnlyBlock(block);
-  }
-
-  lastRootSignature.set(root, stripBidiMarkers(root.textContent ?? ""));
+  applyReaderBidi(root);
+  lastRootSignature.set(root, rootSignature(root));
 }
 
 /**
- * Scan assistant/user message containers for BiDi CSS + marker fixes.
+ * Scan assistant/user message containers for BiDi direction hints.
  */
 export function scanMessageSurfaces(doc: Document, hostname: string, pathname = ""): void {
   if (!doc.body) return;
@@ -147,8 +76,6 @@ export function scanMessageSurfaces(doc: Document, hostname: string, pathname = 
       if (!(el instanceof HTMLElement)) continue;
       if (seen.has(el)) continue;
       seen.add(el);
-      if (isInsideEditable(el)) continue;
-      if (isInsideCssOnlyComposer(el, hostname)) continue;
       scanMessageRoot(el, hostname);
     }
   }
@@ -162,23 +89,17 @@ export function scanMessageSurfacesFromElement(
   const doc = el.ownerDocument;
   if (!doc) return;
   const selectors = getMessageRootSelectors(hostname, pathname);
+  const seen = new Set<Element>();
+
   for (const sel of selectors) {
-    if (
-      el.matches(sel) &&
-      el instanceof HTMLElement &&
-      !isInsideEditable(el) &&
-      !isInsideCssOnlyComposer(el, hostname)
-    ) {
+    if (el.matches(sel) && el instanceof HTMLElement && !seen.has(el)) {
+      seen.add(el);
       scanMessageRoot(el, hostname);
     }
     for (const found of el.querySelectorAll(sel)) {
-      if (
-        found instanceof HTMLElement &&
-        !isInsideEditable(found) &&
-        !isInsideCssOnlyComposer(found, hostname)
-      ) {
-        scanMessageRoot(found, hostname);
-      }
+      if (!(found instanceof HTMLElement) || seen.has(found)) continue;
+      seen.add(found);
+      scanMessageRoot(found, hostname);
     }
   }
 }

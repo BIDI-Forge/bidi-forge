@@ -1,0 +1,152 @@
+/**
+ * BIDI - Forge content styles.
+ *
+ * Injected through the manifest (not a <style> element) so strict site CSP cannot block it.
+ * Everything is keyed on attributes/classes the content script sets, so the sheet is inert
+ * while the extension is disabled.
+ *
+ * Reader surfaces (assistant/user messages): the script resolves a direction per block and
+ * writes `data-bf-dir`; markers, indentation, and alignment then follow that direction.
+ * Composer surfaces: no DOM writes at all — `unicode-bidi: plaintext` lets every block pick
+ * its own direction while typing.
+ */
+
+/* ── Rendered messages ─────────────────────────────────────────────────── */
+
+[data-bf-dir="rtl"] {
+  direction: rtl !important;
+}
+
+[data-bf-dir="ltr"] {
+  direction: ltr !important;
+}
+
+[data-bf-dir] {
+  unicode-bidi: isolate !important;
+}
+
+/* Cells keep the site's own alignment (markdown column alignment). */
+[data-bf-dir]:not([data-bf="cell"]) {
+  text-align: start !important;
+}
+
+/* Lists: marker side and indentation follow the resolved direction, never a physical padding. */
+[data-bf="list"] {
+  list-style-position: outside !important;
+  padding-inline-start: 1.5em !important;
+}
+
+[data-bf="list"][data-bf-dir="rtl"] {
+  padding-left: 0 !important;
+}
+
+[data-bf="list"][data-bf-dir="ltr"] {
+  padding-right: 0 !important;
+}
+
+[data-bf="item"] {
+  display: list-item !important;
+}
+
+/* Inline code is an atomic LTR run: isolated so it cannot reorder the sentence around it. */
+[data-bf="code"] {
+  direction: ltr !important;
+  unicode-bidi: isolate !important;
+}
+
+/* Code blocks stay fully LTR regardless of the surrounding message direction. */
+[data-bf="pre"] {
+  direction: ltr !important;
+  unicode-bidi: isolate !important;
+  text-align: left !important;
+}
+
+/* ── Live composers (ProseMirror / tiptap / Quill / textarea) ──────────── */
+
+.bf-composer,
+.bf-composer p,
+.bf-composer li,
+.bf-composer blockquote,
+.bf-composer h1,
+.bf-composer h2,
+.bf-composer h3,
+.bf-composer h4,
+.bf-composer h5,
+.bf-composer h6,
+.bf-composer td,
+.bf-composer th,
+.bf-composer div[role="paragraph"] {
+  unicode-bidi: plaintext !important;
+  text-align: start !important;
+}
+
+/*
+ * List markers in a composer.
+ *
+ * The marker side follows the `direction` property, which we cannot set per item: writing
+ * attributes on ProseMirror's own nodes makes it redraw them and drop the hint. `inside` moves
+ * the marker into the first line box instead, where it follows that line's plaintext direction —
+ * bullets and numbers land on the right for a Persian item and on the left for an English one,
+ * with no DOM writes at all.
+ *
+ * The counter styles only exist to add a non-breaking gap around the marker: with `inside`,
+ * `::marker` margins do not apply, and the default suffix space collapses next to RTL text.
+ */
+@counter-style bf-bullet {
+  system: cyclic;
+  symbols: "\2022";
+  prefix: "\00a0\00a0";
+  suffix: "\00a0\00a0";
+}
+
+@counter-style bf-number {
+  system: extends decimal;
+  prefix: "\00a0\00a0";
+  suffix: ".\00a0\00a0";
+}
+
+.bf-composer ul,
+.bf-composer ol {
+  unicode-bidi: plaintext !important;
+  list-style-position: inside !important;
+  padding-inline-start: 0.75em !important;
+  padding-right: 0 !important;
+}
+
+.bf-composer ul {
+  list-style-type: bf-bullet !important;
+}
+
+.bf-composer ol {
+  list-style-type: bf-number !important;
+}
+
+.bf-composer li {
+  display: list-item !important;
+  list-style-position: inside !important;
+}
+
+/*
+ * tiptap wraps item content in a paragraph. An `inside` marker on the `li` would then get a line
+ * of its own above the text, so the marker moves to that paragraph and the `li` stops generating
+ * one (`display: block` also keeps the ordered-list counter from being incremented twice).
+ */
+.bf-composer li:has(> p) {
+  display: block !important;
+}
+
+.bf-composer li > p:first-child {
+  display: list-item !important;
+  list-style-position: inside !important;
+}
+
+.bf-composer code {
+  unicode-bidi: isolate !important;
+}
+
+.bf-composer pre,
+.bf-composer pre code {
+  direction: ltr !important;
+  unicode-bidi: isolate !important;
+  text-align: left !important;
+}
